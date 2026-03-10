@@ -40,10 +40,10 @@ jobs:
           BOSS_NAME: ${{ secrets.BOSS_NAME }}
           PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
         run: |
-          pip install google-generativeai --quiet
+          pip install google-genai --quiet
 
           python3 - <<'PYEOF'
-          import google.generativeai as genai
+          from google import genai
           import os, json
 
           commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
@@ -78,9 +78,11 @@ jobs:
           {files[:2000]}
           """
 
-          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-          model = genai.GenerativeModel("gemini-1.5-flash")
-          response = model.generate_content(prompt)
+          client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+          response = client.models.generate_content(
+              model="gemini-2.0-flash",
+              contents=prompt
+          )
 
           text = response.text.strip()
           text = text.replace("```json", "").replace("```", "").strip()
