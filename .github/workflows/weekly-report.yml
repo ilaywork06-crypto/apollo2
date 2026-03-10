@@ -44,7 +44,7 @@ jobs:
 
           python3 - <<'PYEOF'
           from groq import Groq
-          import os, json
+          import os, json, re
 
           commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
           files   = open("/tmp/files.txt").read()   or "אין שינויי קבצים"
@@ -55,6 +55,8 @@ jobs:
 
           החזר JSON בלבד, ללא backticks, בפורמט הזה בדיוק:
           {{"subject": "נושא המייל", "body": "גוף המייל"}}
+
+          חשוב: בתוך ה-JSON השתמש ב-\\n לשורות חדשות, לא בשורות חדשות אמיתיות.
 
           הדוח יכלול:
           1. פתיחה מנומסת
@@ -88,14 +90,25 @@ jobs:
           text = response.choices[0].message.content.strip()
           text = text.replace("```json", "").replace("```", "").strip()
 
+          # נקה תווי בקרה שפוגעים ב-JSON
+          text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+
+          # חלץ רק את ה-JSON מתוך התשובה
+          match = re.search(r'\{.*\}', text, re.DOTALL)
+          if match:
+              text = match.group(0)
+
           data = json.loads(text)
+
+          # המר \n לשורות חדשות אמיתיות בגוף המייל
+          body = data["body"].replace("\\n", "\n")
 
           with open("/tmp/email_subject.txt", "w") as f:
               f.write(data["subject"])
           with open("/tmp/email_body.txt", "w") as f:
-              f.write(data["body"])
+              f.write(body)
 
-          print("✅ סיכום נוצר בהצלחה")
+          print("סיכום נוצר בהצלחה")
           print("נושא:", data["subject"])
           PYEOF
 
@@ -123,5 +136,5 @@ jobs:
               server.login(os.environ["GMAIL_USER"], os.environ["GMAIL_APP_PASSWORD"])
               server.send_message(msg)
 
-          print("✅ המייל נשלח בהצלחה!")
+          print("המייל נשלח בהצלחה!")
           PYEOF
