@@ -35,15 +35,16 @@ jobs:
 
       - name: Generate AI summary in Hebrew
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YOUR_NAME: ${{ secrets.YOUR_NAME }}
           BOSS_NAME: ${{ secrets.BOSS_NAME }}
           PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
         run: |
-          pip install anthropic --quiet
+          pip install google-generativeai --quiet
 
           python3 - <<'PYEOF'
-          import anthropic, os, json
+          import google.generativeai as genai
+          import os, json
 
           commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
           files   = open("/tmp/files.txt").read()   or "אין שינויי קבצים"
@@ -77,14 +78,11 @@ jobs:
           {files[:2000]}
           """
 
-          client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-          message = client.messages.create(
-              model="claude-opus-4-5",
-              max_tokens=1500,
-              messages=[{"role": "user", "content": prompt}]
-          )
+          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+          model = genai.GenerativeModel("gemini-1.5-flash")
+          response = model.generate_content(prompt)
 
-          text = message.content[0].text.strip()
+          text = response.text.strip()
           text = text.replace("```json", "").replace("```", "").strip()
 
           data = json.loads(text)
