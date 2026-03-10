@@ -1,0 +1,126 @@
+name: Weekly Report to Boss
+
+on:
+  schedule:
+    - cron: '0 9 * * 4'
+  workflow_dispatch:
+
+jobs:
+  send-weekly-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect git changes
+        run: |
+          SINCE=$(date -d '7 days ago' '+%Y-%m-%d')
+          echo "TODAY=$(date '+%d/%m/%Y')" >> $GITHUB_ENV
+          echo "WEEK_START=$(date -d '7 days ago' '+%d/%m/%Y')" >> $GITHUB_ENV
+          echo "COMMIT_COUNT=$(git log --since="$SINCE" --oneline | wc -l)" >> $GITHUB_ENV
+
+          git log --since="$SINCE" \
+            --pretty=format:"- %ad | %s" \
+            --date=short > /tmp/commits.txt
+
+          git log --since="$SINCE" --pretty=format: --name-status \
+            | grep -v '^$' \
+            | sed 's/^A\t/נוסף: /' \
+            | sed 's/^M\t/עודכן: /' \
+            | sed 's/^D\t/נמחק: /' \
+            | sort -u | head -50 > /tmp/files.txt
+
+      - name: Generate AI summary in Hebrew
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUR_NAME: ${{ secrets.YOUR_NAME }}
+          BOSS_NAME: ${{ secrets.BOSS_NAME }}
+          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+        run: |
+          pip install anthropic --quiet
+
+          python3 - <<'PYEOF'
+          import anthropic, os, json
+
+          commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
+          files   = open("/tmp/files.txt").read()   or "אין שינויי קבצים"
+
+          prompt = f"""אתה עוזר לכתיבת דוחות התקדמות שבועיים בעברית מקצועית.
+
+          כתוב דוח התקדמות על בסיס הנתונים הבאים.
+
+          החזר JSON בלבד, ללא backticks, בפורמט הזה בדיוק:
+          {{"subject": "נושא המייל", "body": "גוף המייל"}}
+
+          הדוח יכלול:
+          1. פתיחה מנומסת
+          2. סיכום מנהלים (2-3 משפטים)
+          3. עבודה שבוצעה (נקודות)
+          4. שינויים עיקריים בקבצים
+          5. סטטוס נוכחי וצעדים הבאים
+          6. חתימה מקצועית
+
+          פרטים:
+          מפתח: {os.environ['YOUR_NAME']}
+          מנהל: {os.environ['BOSS_NAME']}
+          פרויקט: {os.environ['PROJECT_NAME']}
+          תקופה: {os.environ['WEEK_START']} עד {os.environ['TODAY']}
+          מספר commits: {os.environ['COMMIT_COUNT']}
+
+          Commits:
+          {commits[:4000]}
+
+          קבצים שהשתנו:
+          {files[:2000]}
+          """
+
+          client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+          message = client.messages.create(
+              model="claude-opus-4-5",
+              max_tokens=1500,
+              messages=[{"role": "user", "content": prompt}]
+          )
+
+          text = message.content[0].text.strip()
+          text = text.replace("```json", "").replace("```", "").strip()
+
+          data = json.loads(text)
+
+          with open("/tmp/email_subject.txt", "w") as f:
+              f.write(data["subject"])
+          with open("/tmp/email_body.txt", "w") as f:
+              f.write(data["body"])
+
+          print("✅ סיכום נוצר בהצלחה")
+          print("נושא:", data["subject"])
+          PYEOF
+
+      - name: Send email via Gmail
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          BOSS_EMAIL: ${{ secrets.BOSS_EMAIL }}
+        run: |
+          python3 - <<'PYEOF'
+          import smtplib, os
+          from email.mime.text import MIMEText
+          from email.mime.multipart import MIMEMultipart
+
+          subject = open("/tmp/email_subject.txt").read().strip()
+          body    = open("/tmp/email_body.txt").read().strip()
+
+          msg = MIMEMultipart()
+          msg["From"]    = os.environ["GMAIL_USER"]
+          msg["To"]      = os.environ["BOSS_EMAIL"]
+          msg["Subject"] = subject
+          msg.attach(MIMEText(body, "plain", "utf-8"))
+
+          with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+              server.login(os.environ["GMAIL_USER"], os.environ["GMAIL_APP_PASSWORD"])
+              server.send_message(msg)
+
+          print("✅ המייל נשלח בהצלחה!")
+          PYEOF
