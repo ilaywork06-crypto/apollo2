@@ -1,0 +1,141 @@
+name: Weekly Report to Boss
+
+on:
+  schedule:
+    # כל יום חמישי בשעה 12:00 (UTC+3 = 09:00 UTC)
+    - cron: '0 9 * * 4'
+  workflow_dispatch: # אפשרות להפעיל ידנית לבדיקה
+
+jobs:
+  send-weekly-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. שליפת ה-repo המלא עם כל ההיסטוריה ──────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # חשוב! מביא את כל ההיסטוריה ולא רק commit אחד
+
+      # ── 2. איסוף נתוני git מהשבוע האחרון ──────────────────────────────────
+      - name: Collect git changes
+        id: git_data
+        run: |
+          # תאריך לפני 7 ימים
+          SINCE=$(date -d '7 days ago' '+%Y-%m-%d')
+          TODAY=$(date '+%d/%m/%Y')
+          WEEK_START=$(date -d '7 days ago' '+%d/%m/%Y')
+
+          echo "TODAY=$TODAY" >> $GITHUB_ENV
+          echo "WEEK_START=$WEEK_START" >> $GITHUB_ENV
+
+          # Commits מהשבוע
+          COMMITS=$(git log --since="$SINCE" \
+            --pretty=format:"📌 %ad | %s" \
+            --date=short)
+
+          # קבצים ששונו
+          FILES_CHANGED=$(git log --since="$SINCE" \
+            --pretty=format: \
+            --name-status | \
+            grep -v '^$' | \
+            sed 's/^A\t/✅ נוסף: /' | \
+            sed 's/^M\t/✏️ עודכן: /' | \
+            sed 's/^D\t/🗑️ נמחק: /' | \
+            sort -u | head -50)
+
+          # diff מקוצר (לא יותר מ-4000 תווים)
+          DIFF=$(git diff --stat HEAD~$(git log --since="$SINCE" --oneline | wc -l) HEAD 2>/dev/null | head -40 || echo "אין diff זמין")
+
+          # שמירה לקובץ (כדי להימנע מבעיות עם תווים מיוחדים)
+          echo "$COMMITS" > /tmp/commits.txt
+          echo "$FILES_CHANGED" > /tmp/files.txt
+          echo "$DIFF" > /tmp/diff.txt
+
+          # ספירה
+          COMMIT_COUNT=$(git log --since="$SINCE" --oneline | wc -l)
+          echo "COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
+
+      # ── 3. סיכום עם Claude API ──────────────────────────────────────────────
+      - name: Generate AI summary in Hebrew
+        id: ai_summary
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUR_NAME: ${{ secrets.YOUR_NAME }}
+          BOSS_NAME: ${{ secrets.BOSS_NAME }}
+          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+        run: |
+          COMMITS=$(cat /tmp/commits.txt)
+          FILES=$(cat /tmp/files.txt)
+          DIFF=$(cat /tmp/diff.txt)
+
+          # בניית ה-prompt
+          PAYLOAD=$(jq -n \
+            --arg commits "$COMMITS" \
+            --arg files "$FILES" \
+            --arg diff "$DIFF" \
+            --arg your_name "$YOUR_NAME" \
+            --arg boss_name "$BOSS_NAME" \
+            --arg project "$PROJECT_NAME" \
+            --arg today "$TODAY" \
+            --arg week_start "$WEEK_START" \
+            --arg count "$COMMIT_COUNT" \
+            '{
+              model: "claude-opus-4-5",
+              max_tokens: 1500,
+              messages: [{
+                role: "user",
+                content: ("אתה עוזר לכתיבת דוחות התקדמות שבועיים בעברית מקצועית.\n\nכתוב דוח התקדמות מפורט ומסודר בעברית מקצועית על בסיס הנתונים הבאים.\n\nהמבנה:\n1. שורת נושא למייל (קצרה ומקצועית)\n2. פתיחה מנומסת לבוס\n3. סיכום מנהלים (2-3 משפטים)\n4. עבודה שבוצעה השבוע (bullet points)\n5. שינויים עיקריים בקוד/קבצים\n6. סטטוס נוכחי\n7. צעדים הבאים\n8. חתימה מקצועית\n\nהחזר JSON בלבד (ללא backticks):\n{\"subject\": \"...\", \"body\": \"...\"}\n\nפרטים:\nמפתח: " + $your_name + "\nמנהל: " + $boss_name + "\nפרויקט: " + $project + "\nתקופה: " + $week_start + " עד " + $today + "\nמספר commits: " + $count + "\n\nCommits:\n" + $commits + "\n\nקבצים שהשתנו:\n" + $files + "\n\nסטטיסטיקת שינויים:\n" + $diff)
+              }]
+            }')
+
+          # קריאה ל-API
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$PAYLOAD")
+
+          # חילוץ התוצאה
+          AI_TEXT=$(echo "$RESPONSE" | jq -r '.content[0].text')
+          EMAIL_SUBJECT=$(echo "$AI_TEXT" | jq -r '.subject')
+          EMAIL_BODY=$(echo "$AI_TEXT" | jq -r '.body')
+
+          echo "EMAIL_SUBJECT=$EMAIL_SUBJECT" >> $GITHUB_ENV
+          echo "$EMAIL_BODY" > /tmp/email_body.txt
+
+      # ── 4. שליחת מייל דרך Gmail ─────────────────────────────────────────────
+      - name: Send email via Gmail
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          BOSS_EMAIL: ${{ secrets.BOSS_EMAIL }}
+        run: |
+          EMAIL_BODY=$(cat /tmp/email_body.txt)
+
+          python3 - <<EOF
+          import smtplib, os
+          from email.mime.text import MIMEText
+          from email.mime.multipart import MIMEMultipart
+
+          gmail_user     = os.environ["GMAIL_USER"]
+          gmail_password = os.environ["GMAIL_APP_PASSWORD"]
+          boss_email     = os.environ["BOSS_EMAIL"]
+          subject        = os.environ["EMAIL_SUBJECT"]
+
+          with open("/tmp/email_body.txt") as f:
+              body = f.read()
+
+          msg = MIMEMultipart()
+          msg["From"]    = gmail_user
+          msg["To"]      = boss_email
+          msg["Subject"] = subject
+
+          msg.attach(MIMEText(body, "plain", "utf-8"))
+
+          with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+              server.login(gmail_user, gmail_password)
+              server.send_message(msg)
+
+          print("✅ המייל נשלח בהצלחה!")
+          EOF
