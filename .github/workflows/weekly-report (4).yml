@@ -35,15 +35,15 @@ jobs:
 
       - name: Generate AI summary in Hebrew
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUR_NAME: ${{ secrets.YOUR_NAME }}
           BOSS_NAME: ${{ secrets.BOSS_NAME }}
           PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
         run: |
-          pip install google-genai --quiet
+          pip install groq --quiet
 
           python3 - <<'PYEOF'
-          from google import genai
+          from groq import Groq
           import os, json
 
           commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
@@ -78,13 +78,14 @@ jobs:
           {files[:2000]}
           """
 
-          client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-          response = client.models.generate_content(
-              model="gemini-2.0-flash",
-              contents=prompt
+          client = Groq(api_key=os.environ["GROQ_API_KEY"])
+          response = client.chat.completions.create(
+              model="llama-3.3-70b-versatile",
+              messages=[{"role": "user", "content": prompt}],
+              max_tokens=1500,
           )
 
-          text = response.text.strip()
+          text = response.choices[0].message.content.strip()
           text = text.replace("```json", "").replace("```", "").strip()
 
           data = json.loads(text)
