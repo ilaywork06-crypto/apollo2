@@ -49,6 +49,3 @@ def parse_xml_file(filename):
     return list_of_kupot
 
 kupot_list = parse_xml_file(r'c:\Users\ilay atia\code\apollo2\parsers\xml2.xml')
-print("Total high risk kupot found:", sum(1 for kupa in kupot_list if kupa['risk_level'] == 'high'))
-print("Total medium risk kupot found:", sum(1 for kupa in kupot_list if kupa['risk_level'] == 'medium'))
-print("Total low risk kupot found:", sum(1 for kupa in kupot_list if kupa['risk_level'] == 'low'))
