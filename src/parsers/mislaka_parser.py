@@ -14,6 +14,7 @@ def parse_mislaka_file(filename):
     for row in mutzar:
         KOD_MEZAHE_YATZRAN = extract_data_from_xml('.//KOD-MEZAHE-YATZRAN', row)
         for polisa in row.iter('HeshbonOPolisa'):
+            KOD_MASLUL_HASHKAA = extract_data_from_xml('.//PerutMasluleiHashkaa/KOD-MASLUL-HASHKAA', polisa)
             SHEM_TOCHNIT = extract_data_from_xml('.//SHEM-TOCHNIT', polisa)
             TAARICH_HITZTARFUT_MUTZAR = extract_data_from_xml('.//TAARICH-HITZTARFUT-MUTZAR', polisa)
             TOTAL_CHISACHON_MTZBR = extract_data_from_xml('.//TOTAL-CHISACHON-MTZBR', polisa, float)
@@ -30,6 +31,7 @@ def parse_mislaka_file(filename):
             SHEUR_DMEI_NIHUL_HAFKADA = extract_data_from_xml('.//SHEUR-DMEI-NIHUL-HAFKADA', polisa, float)
 
             list_of_kupot.append({
+                "GEMELNET_ID": str(int(KOD_MASLUL_HASHKAA[-6:])).strip(),
     "SHEM-TOCHNIT": SHEM_TOCHNIT.strip(),
     "TAARICH-HITZTARFUT-MUTZAR": TAARICH_HITZTARFUT_MUTZAR.strip(),
     "TOTAL-CHISACHON-MTZBR": TOTAL_CHISACHON_MTZBR,
@@ -40,4 +42,3 @@ def parse_mislaka_file(filename):
 
     return list_of_kupot
 
-kupot_list = parse_mislaka_file(r'c:\Users\ilay atia\code\apollo2\parsers\ilay.xml')
