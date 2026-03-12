@@ -35,9 +35,13 @@ def parse_xml_file(filename):
         TSUA_SHNATIT_MEMUZAAT_3_SHANIM = extract_data_from_xml('TSUA_SHNATIT_MEMUZAAT_3_SHANIM', row, float)
         TSUA_SHNATIT_MEMUZAAT_5_SHANIM = extract_data_from_xml('TSUA_SHNATIT_MEMUZAAT_5_SHANIM', row, float)
         RISK_LEVEL = get_risk_level(HITMAHUT_MISHNIT.strip())
+        TSUA_MITZTABERET_LETKUFA = extract_data_from_xml('TSUA_MITZTABERET_LETKUFA', row, float)
+        SHARP_RIBIT_HASRAT_SIKUN = extract_data_from_xml('SHARP_RIBIT_HASRAT_SIKUN', row, float)
 
         list_of_kupot.append({
             "ID": ID.strip(),
+            "tsua_mitztaberet_letkufa": TSUA_MITZTABERET_LETKUFA,
+            "sharp_ribit_hasarot_sikun": SHARP_RIBIT_HASRAT_SIKUN,
     "shem_kupa": SHM_KUPA.strip(),
     "hevra": SHM_HEVRA_MENAHELET.strip(),
     "hitmahut_rashit": HITMAHUT_RASHIT.strip(),
