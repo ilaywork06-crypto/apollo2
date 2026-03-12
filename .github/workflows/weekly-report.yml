@@ -2,7 +2,7 @@ name: Weekly Report to Boss
 
 on:
   schedule:
-    - cron: '0 9 * * 4'
+    - cron: '0 21 * * 3'
   workflow_dispatch:
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
 
           python3 - <<'PYEOF'
           from groq import Groq
-          import os, json, re
+          import os, re
 
           commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
           files   = open("/tmp/files.txt").read()   or "אין שינויי קבצים"
@@ -62,26 +62,26 @@ jobs:
           prompt = f"""אתה עוזר שכותב מיילים בשם מפתח תוכנה לבוס שלו, בעברית מקצועית.
 
           כתוב דוח שבועי מפורט ומעמיק על בסיס הנתונים שיינתנו לך.
-          
+
           כללי שפה חשובים:
-          - הפתיחה תהיה פשוטה וטבעית — למשל "היי {os.environ['BOSS_NAME']}," או "שלום {os.environ['BOSS_NAME']}," — בלי לציין תפקידים או שמות פרויקטים
-          - הסיום יהיה אנושי וקצר — למשל "תודה, {os.environ['YOUR_NAME']}" — בלי כותרות תפקיד
-          - לא להשתמש בביטויים כמו "מפתח הפרויקט", "מנהל הפרויקט", "בכבוד רב" וכדומה
-          - לכתוב בגוף ראשון, כאילו {os.environ['YOUR_NAME']} בעצמו כותב
+          - הפתיחה תהיה פשוטה וטבעית — למשל "היי {os.environ['BOSS_NAME']}," או "שלום {os.environ['BOSS_NAME']},"
+          - הסיום יהיה אנושי וקצר — למשל "תודה, {os.environ['YOUR_NAME']}"
+          - לא להשתמש בביטויים כמו "מפתח הפרויקט", "מנהל הפרויקט", "בכבוד רב"
+          - לכתוב בגוף ראשון
 
           לגבי התוכן — כתוב כמה שיותר מפורט ומעמיק:
-          - עבור כל commit — הסבר מה בוצע, למה זה חשוב ומה ההשפעה שלו על המערכת
-          - עבור כל קובץ שהשתנה — הסבר מה בדיוק השתנה בו, מדוע השינוי היה נחוץ ומה הוא משפר
-          - אם נוסף קובץ חדש — הסבר את תפקידו במערכת
-          - אם נמחק קובץ — הסבר מדוע הוסר
+          - עבור כל commit — הסבר מה בוצע, למה זה חשוב ומה ההשפעה שלו
+          - עבור כל קובץ שהשתנה — הסבר מה בדיוק השתנה, מדוע ומה זה משפר
+          - אם נוסף קובץ חדש — הסבר את תפקידו
           - נתח אתגרים טכניים שעולים מהקוד ואיך טופלו
-          - פרט את הסטטוס הנוכחי — מה מוכן, מה בעבודה
-          - פרט את הצעדים הבאים לשבוע הקרוב
-          - כתוב רק דברים שיש לך בסיס לכתוב עליהם מהנתונים — אל תמציא
+          - פרט סטטוס נוכחי וצעדים הבאים
+          - כתוב רק דברים שיש לך בסיס לכתוב עליהם
 
-          החזר JSON בלבד, ללא backticks, בפורמט הזה בדיוק:
-          {{"subject": "נושא המייל", "body": "גוף המייל"}}
-          בתוך ה-JSON השתמש ב-\\n לשורות חדשות.
+          החזר את התשובה בפורמט הבא בדיוק — שתי שורות ראשונות הן הנושא, אחריהן שורה עם ---BODY--- ואחריה גוף המייל:
+
+          SUBJECT: נושא המייל כאן
+          ---BODY---
+          גוף המייל כאן
 
           פרטים:
           שם המפתח: {os.environ['YOUR_NAME']}
@@ -107,25 +107,27 @@ jobs:
           )
 
           text = response.choices[0].message.content.strip()
-          text = text.replace("```json", "").replace("```", "").strip()
 
-          text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
-
-          match = re.search(r'\{.*\}', text, re.DOTALL)
-          if match:
-              text = match.group(0)
-
-          data = json.loads(text)
-
-          body = data["body"].replace("\\n", "\n")
+          # חלץ subject ו-body לפי delimiter
+          if "---BODY---" in text:
+              parts = text.split("---BODY---", 1)
+              subject_line = parts[0].strip()
+              body = parts[1].strip()
+              # נקה SUBJECT: מהתחלה אם יש
+              subject = re.sub(r'^SUBJECT:\s*', '', subject_line, flags=re.IGNORECASE).strip()
+          else:
+              # fallback — שורה ראשונה היא הנושא, השאר הגוף
+              lines = text.splitlines()
+              subject = re.sub(r'^SUBJECT:\s*', '', lines[0], flags=re.IGNORECASE).strip()
+              body = "\n".join(lines[1:]).strip()
 
           with open("/tmp/email_subject.txt", "w") as f:
-              f.write(data["subject"])
+              f.write(subject)
           with open("/tmp/email_body.txt", "w") as f:
               f.write(body)
 
           print("סיכום נוצר בהצלחה")
-          print("נושא:", data["subject"])
+          print("נושא:", subject)
           PYEOF
 
       - name: Send email via Gmail
