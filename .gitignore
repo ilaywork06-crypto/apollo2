@@ -137,3 +137,8 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+src/__pycache__/__init__.cpython-313.pyc
+src/engines/__pycache__/engine.cpython-313.pyc
+src/parsers/__pycache__/parser.cpython-313.pyc
+src/parsers/__pycache__/mislaka_parser.cpython-313.pyc
+src/api/__pycache__/app.cpython-313.pyc

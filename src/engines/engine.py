@@ -32,18 +32,30 @@ def normalize_data(kupot_list):
             if kupa[field] != 0.0:
                 kupa[field + "_normalized"] = (kupa[field] - min_value) / (max_value - min_value)* 100 if max_value > min_value else 0.0
             else:
-                kupa[field + "_normalized"] = None
+                kupa[field + "_normalized"] = 0.0
 
 def calculate_grade(kupa):
     weights = {}
-    if kupa.get("sharp_ribit_hasarot_sikun_normalized") is not None:
-        weights["sharp_ribit_hasarot_sikun_normalized"] = 50
-    if kupa.get("tsua_5_normalized") is not None:
-        weights["tsua_5_normalized"] = 20
-    if kupa.get("tsua_3_normalized") is not None:
-        weights["tsua_3_normalized"] = 20
-    if kupa.get("tsua_mitztaberet_letkufa_normalized") is not None:
-        weights["tsua_mitztaberet_letkufa_normalized"] = 10
+
+    if kupa.get("tsua_mitztaberet_letkufa_normalized") != 0.0:
+        if kupa.get("tsua_3_normalized") != 0.0:
+            if kupa.get("tsua_5_normalized") != 0.0:
+                if kupa.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
+                    weights["tsua_mitztaberet_letkufa_normalized"] = 10
+                    weights["sharp_ribit_hasarot_sikun_normalized"] = 50
+                    weights["tsua_5_normalized"] = 20
+                    weights["tsua_3_normalized"] = 20
+                else:
+                    weights["tsua_mitztaberet_letkufa_normalized"] = 10
+                    weights["tsua_5_normalized"] = 50
+                    weights["tsua_3_normalized"] = 40
+            else: 
+                weights["tsua_mitztaberet_letkufa_normalized"] = 30
+                weights["tsua_3_normalized"] = 70
+        else:
+            weights["tsua_mitztaberet_letkufa_normalized"] = 100
+    else:
+        pass
 
     if not weights:
         return 0
@@ -75,8 +87,8 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     return round(potential, 2)
 
 def run_comparison():
-    kupot_list = parse_xml_file(r'c:\Users\ilay atia\code\apollo2\src\parsers\xml2.xml')
-    mislaka_list = parse_mislaka_file(r'c:\Users\ilay atia\code\apollo2\src\parsers\ilay.xml')
+    kupot_list = parse_xml_file(r'/Users/msphttyh/Documents/apolo/apollo2/src/parsers/xml2.xml')
+    mislaka_list = parse_mislaka_file(r'/Users/msphttyh/Documents/apolo/apollo2/src/parsers/ilay.xml')
     matches = find_matching_kupot(mislaka_list, kupot_list)
 
     for mislaka, kupa in matches:
