@@ -6,10 +6,9 @@ def extract_data_from_xml(field_name, row, field_type=str):
         return field_type(data.text)
     return "N/A" if field_type == str else 0.0
 
-def parse_mislaka_file(filename):
+def parse_mislaka_file(content):
     list_of_kupot = []
-    tree = ET.parse(filename)
-    root = tree.getroot()
+    root = ET.fromstring(content)
     mutzar = root.iter('Mutzar')
     for row in mutzar:
         KOD_MEZAHE_YATZRAN = extract_data_from_xml('.//KOD-MEZAHE-YATZRAN', row)

@@ -18,10 +18,9 @@ def extract_data_from_xml(field_name, row, field_type=str):
         return field_type(data.text)
     return "N/A" if field_type == str else 0.0
 
-def parse_xml_file(filename):
+def parse_xml_file(content):
     list_of_kupot = []
-    tree = ET.parse(filename)
-    root = tree.getroot()
+    root = ET.fromstring(content)
     for row in root.findall('Row'):
         SUG_KUPA = extract_data_from_xml('SUG_KUPA', row)
         if SUG_KUPA != 'קופת גמל להשקעה':

@@ -45,19 +45,8 @@ def calculate_grade(kupa):
                     weights["sharp_ribit_hasarot_sikun_normalized"] = 50
                     weights["tsua_5_normalized"] = 20
                     weights["tsua_3_normalized"] = 20
-                else:
-                    weights["tsua_mitztaberet_letkufa_normalized"] = 10
-                    weights["tsua_5_normalized"] = 50
-                    weights["tsua_3_normalized"] = 40
-            else: 
-                weights["tsua_mitztaberet_letkufa_normalized"] = 30
-                weights["tsua_3_normalized"] = 70
-        else:
-            weights["tsua_mitztaberet_letkufa_normalized"] = 100
-    else:
-        pass
 
-    if not weights:
+    if not weights or len(weights) != 4:
         return 0
 
     total_weight = sum(weights.values())
@@ -70,6 +59,7 @@ def calculate_grade(kupa):
 def add_grade_and_sort(kupot_list):
     for kupa in kupot_list:
         kupa["grade"] = calculate_grade(kupa)
+
     return sorted(kupot_list, key=lambda x: x["grade"], reverse=True)
 
 def get_top_3(sorted_kupot):
@@ -86,11 +76,11 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     potential = current_amount * (1 + diff / 100)
     return round(potential, 2)
 
-def run_comparison():
-    kupot_list = parse_xml_file(r'/Users/msphttyh/Documents/apolo/apollo2/src/parsers/xml2.xml')
-    mislaka_list = parse_mislaka_file(r'/Users/msphttyh/Documents/apolo/apollo2/src/parsers/ilay.xml')
+def run_comparison(gemel_net_file, mislaka_file):
+    kupot_list = parse_xml_file(gemel_net_file)
+    mislaka_list = parse_mislaka_file(mislaka_file)
     matches = find_matching_kupot(mislaka_list, kupot_list)
-
+    output = []
     for mislaka, kupa in matches:
         risk_level = kupa['risk_level']
         all_kopot_in_risk_level = get_kupot_by_risk_level(kupot_list, risk_level)
@@ -101,14 +91,19 @@ def run_comparison():
         sorted_kupot = add_grade_and_sort(adjusted_kupot)   
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
-        print(f"Rank - {client_ranking}/{total_kupot}")
+        
         client_kupa = next(k for k in sorted_kupot if k["ID"] == kupa["ID"])
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
+        kupa_rank = 1
         for better_kupa in top_3:
             if better_kupa["ID"] != client_kupa["ID"]:
                 potential_amount = calculate_potential_amount(money, client_kupa, better_kupa)
-                print(f"Client's Kupa: {client_kupa['shem_kupa']} (Grade: {client_kupa['grade']})")
-                print(f"Better Kupa: {better_kupa['shem_kupa']} (Grade: {better_kupa['grade']})")
-                print(f"Potential amount after switching: {potential_amount} NIS\n")
-
-run_comparison()
+                output.append({
+                "client":f"Client's Kupa: {client_kupa['shem_kupa']}, Kupa id: {client_kupa["ID"]} - (Grade: {client_kupa['grade']}, Rank - {client_ranking}/{total_kupot})",
+                "alternative":f"Better Kupa: {better_kupa['shem_kupa']}, Kupa id : {better_kupa["ID"]} - (Grade: {better_kupa['grade']}), Rank - {kupa_rank}/{total_kupot}",
+                "amount":f"Current amount: {money}",
+                "potential":f"Potential amount after switching: {potential_amount} NIS\n",
+                }
+                )
+            kupa_rank += 1
+    return output
