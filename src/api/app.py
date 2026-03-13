@@ -2,7 +2,14 @@ import uvicorn
 from fastapi import FastAPI, UploadFile, File
 from src.engines.engine import run_comparison
 APP = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
 
+APP.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 @APP.post("/compare")
 async def compare(
     mislaka_file: UploadFile = File(...),

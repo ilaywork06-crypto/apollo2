@@ -17,9 +17,12 @@ def get_kupot_by_risk_level(kupot_list, risk_level):
 
 def apply_dmey_nihul(kupot_list, dmey_nihul):
     for kupa in kupot_list:
-        kupa["tsua_5"] -= dmey_nihul
-        kupa["tsua_3"] -= dmey_nihul
-        kupa["tsua_mitztaberet_letkufa"] -= dmey_nihul
+        if kupa["tsua_5"] > 0.0:
+            kupa["tsua_5"] -= dmey_nihul
+        if kupa["tsua_3"] > 0.0:
+            kupa["tsua_3"] -= dmey_nihul
+        if kupa["tsua_mitztaberet_letkufa"] > 0.0:
+            kupa["tsua_mitztaberet_letkufa"] -= dmey_nihul
     return kupot_list
 
 def normalize_data(kupot_list):
@@ -77,6 +80,7 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     return round(potential, 2)
 
 def run_comparison(gemel_net_file, mislaka_file):
+    funds_list = []
     kupot_list = parse_xml_file(gemel_net_file)
     mislaka_list = parse_mislaka_file(mislaka_file)
     matches = find_matching_kupot(mislaka_list, kupot_list)
@@ -95,6 +99,23 @@ def run_comparison(gemel_net_file, mislaka_file):
         client_kupa = next(k for k in sorted_kupot if k["ID"] == kupa["ID"])
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
         kupa_rank = 1
+        client = {
+    "name": client_kupa["shem_kupa"],
+    "id": client_kupa["ID"],
+    "grade": client_kupa["grade"],
+    "rank": client_ranking,
+    "total_in_risk": total_kupot,
+    "risk_level": risk_level,
+    "amount": money,
+    "dmei_nihul": dmey_nihul,
+    "tsua_1": round(client_kupa["tsua_mitztaberet_letkufa"],2),
+    "tsua_3": round(client_kupa["tsua_3"],2),
+    "tsua_5": round(client_kupa["tsua_5"],2),
+    "hevra": client_kupa["hevra"],
+    "seniority_date": mislaka["TAARICH-HITZTARFUT-MUTZAR"],
+    "percentile": round((total_kupot - client_ranking) / total_kupot * 100)
+}   
+        alternatives = []
         for better_kupa in top_3:
             if better_kupa["ID"] != client_kupa["ID"]:
                 potential_amount = calculate_potential_amount(money, client_kupa, better_kupa)
@@ -105,5 +126,24 @@ def run_comparison(gemel_net_file, mislaka_file):
                 "potential":f"Potential amount after switching: {potential_amount} NIS\n",
                 }
                 )
-            kupa_rank += 1
-    return output
+                alt = {
+    "name": better_kupa["shem_kupa"],
+    "id": better_kupa["ID"],
+    "grade": better_kupa["grade"],
+    "rank": kupa_rank,
+    "hevra": better_kupa["hevra"],
+    "tsua_1": round(better_kupa["tsua_mitztaberet_letkufa"],2),
+    "tsua_3": round(better_kupa["tsua_3"],2),
+    "tsua_5": round(better_kupa["tsua_5"],2),
+    "potential_amount": potential_amount,
+    "diff": round(potential_amount - money, 2),
+    "diff_percent": round((potential_amount - money) / money * 100, 1)
+}
+                alternatives.append(alt)
+                kupa_rank += 1
+        funds_list.append({
+        "client": client,
+        "alternatives": alternatives
+    })
+            
+    return {"funds": funds_list}
