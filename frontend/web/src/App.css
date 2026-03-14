@@ -421,15 +421,14 @@ body::before {
   padding: 32px 24px 80px;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 48px;
 }
 
 /* ─── Fund Results block ─────────────────────────────────────────────────── */
 .fund-results {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 48px;
+  gap: 24px;
 }
 
 /* Fade in animation */
@@ -490,21 +489,10 @@ body::before {
   color: var(--text-secondary);
 }
 
-.client-card-gauge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.gauge-svg { display: block; }
-
-.gauge-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 4px;
+.gauge-container {
   text-align: center;
-  white-space: nowrap;
+  flex-shrink: 0;
+  width: 140px;
 }
 
 /* ─── Stats row ──────────────────────────────────────────────────────────── */
@@ -656,7 +644,7 @@ body::before {
 }
 
 .bar-fill--red {
-  background: var(--accent-red);
+  background: linear-gradient(90deg, #EF4444, #F87171);
 }
 
 .bar-pct {
@@ -751,6 +739,24 @@ body::before {
   color: var(--text-primary);
 }
 
+.td-name-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.td-name-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-red);
+  background: rgba(239,68,68,0.12);
+  padding: 2px 7px;
+  border-radius: 10px;
+  display: inline-block;
+  margin-top: 3px;
+}
+
 .td-return {
   font-weight: 700;
 }
@@ -777,10 +783,27 @@ body::before {
   display: inline-block;
 }
 
+.diff-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-green);
+  margin-top: 3px;
+  padding-right: 2px;
+}
+
+.table-footnote {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  direction: rtl;
+}
+
 /* ─── High-risk card ─────────────────────────────────────────────────────── */
 .highrisk-card {
-  background: linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.06) 100%);
-  border: 1px solid rgba(245,158,11,0.25);
+  background: linear-gradient(135deg, rgba(30,27,75,0.27) 0%, rgba(49,46,129,0.13) 100%);
+  border: 1px solid rgba(67,56,202,0.2);
   border-radius: 18px;
   padding: 22px 28px;
   display: flex;
@@ -800,7 +823,7 @@ body::before {
 .highrisk-title {
   font-size: 15px;
   font-weight: 700;
-  color: var(--accent-amber);
+  color: #818CF8;
   margin-bottom: 6px;
 }
 
@@ -812,7 +835,7 @@ body::before {
 }
 
 .highrisk-pct {
-  color: var(--accent-amber);
+  color: #818CF8;
   font-weight: 800;
 }
 
@@ -825,7 +848,7 @@ body::before {
 
 .highrisk-arrow {
   font-size: 22px;
-  color: var(--accent-amber);
+  color: #818CF8;
 }
 
 .highrisk-amount-item {
@@ -851,46 +874,61 @@ body::before {
   color: var(--accent-green);
 }
 
-/* ─── Action buttons ─────────────────────────────────────────────────────── */
-.action-row {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+.highrisk-amount-sub {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
-.btn-pdf {
-  background: linear-gradient(135deg, var(--accent-green), #059669);
+.highrisk-footnote {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(67,56,202,0.15);
+  line-height: 1.5;
+}
+
+/* ─── PDF download button ────────────────────────────────────────────────── */
+.pdf-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 0;
+}
+
+.results-disclaimer {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+  padding: 16px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+
+.download-pdf-btn {
+  background: linear-gradient(135deg, #10B981, #059669);
   color: #fff;
   border: none;
   border-radius: 12px;
-  padding: 12px 24px;
+  padding: 14px 40px;
   font-family: 'Rubik', sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 8px 32px rgba(16,185,129,0.27);
   transition: all 0.2s;
 }
-.btn-pdf:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(16,185,129,0.3);
+.download-pdf-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(16,185,129,0.4);
+}
+.download-pdf-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
-.btn-sms {
-  background: transparent;
-  border: 1px solid var(--border-light);
-  color: var(--text-secondary);
-  border-radius: 12px;
-  padding: 12px 24px;
-  font-family: 'Rubik', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-sms:hover {
-  background: var(--border);
-  color: var(--text-primary);
+@media print {
+  .pdf-button-container { display: none; }
 }
 
 /* ─── Disclaimer ─────────────────────────────────────────────────────────── */
