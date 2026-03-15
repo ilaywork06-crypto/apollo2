@@ -22,25 +22,44 @@ jobs:
           echo "WEEK_START=$(date -d '7 days ago' '+%d/%m/%Y')" >> $GITHUB_ENV
           echo "COMMIT_COUNT=$(git log --since="$SINCE" --oneline | wc -l)" >> $GITHUB_ENV
 
+          # commits עם תיאורים
           git log --since="$SINCE" \
             --pretty=format:"[%ad] %s%n%b" \
             --date=short > /tmp/commits.txt
 
+          # כל הקבצים שהשתנו ללא הגבלה
           git log --since="$SINCE" --pretty=format: --name-status \
             | grep -v '^$' \
             | sed 's/^A\t/נוסף: /' \
             | sed 's/^M\t/עודכן: /' \
             | sed 's/^D\t/נמחק: /' \
-            | sort -u | head -80 > /tmp/files.txt
+            | sort -u > /tmp/files.txt
+
+          # מבנה תיקיות של הקבצים החדשים — עוזר ל-AI להבין ארכיטקטורה
+          git log --since="$SINCE" --pretty=format: --name-only \
+            | grep -v '^$' | sort -u > /tmp/new_files_list.txt
 
           COMMIT_COUNT=$(git log --since="$SINCE" --oneline | wc -l)
           if [ "$COMMIT_COUNT" -gt "0" ]; then
+            # diff מורחב — 800 שורות במקום 300
             git diff HEAD~$COMMIT_COUNT HEAD -- \
               '*.js' '*.ts' '*.tsx' '*.jsx' '*.py' '*.css' '*.html' '*.json' '*.md' \
-              2>/dev/null | head -300 > /tmp/diff.txt || echo "אין diff" > /tmp/diff.txt
+              2>/dev/null | head -800 > /tmp/diff.txt || echo "אין diff" > /tmp/diff.txt
+
+            # תוכן קבצים חדשים שנוספו (לא רק diff) — כדי שה-AI יראה את הקוד המלא
+            git log --since="$SINCE" --pretty=format: --diff-filter=A --name-only \
+              | grep -v '^$' | sort -u | while read f; do
+                if [[ "$f" =~ \.(js|ts|tsx|jsx|py|css|html|md)$ ]]; then
+                  echo "=== קובץ חדש: $f ===" >> /tmp/new_files_content.txt
+                  git show HEAD:"$f" 2>/dev/null | head -100 >> /tmp/new_files_content.txt
+                  echo "" >> /tmp/new_files_content.txt
+                fi
+              done
           else
             echo "אין שינויים השבוע" > /tmp/diff.txt
           fi
+
+          touch /tmp/new_files_content.txt
 
       - name: Generate AI summary in Hebrew
         env:
@@ -55,9 +74,10 @@ jobs:
           from groq import Groq
           import os, re
 
-          commits = open("/tmp/commits.txt").read() or "אין commits השבוע"
-          files   = open("/tmp/files.txt").read()   or "אין שינויי קבצים"
-          diff    = open("/tmp/diff.txt").read()    or "אין diff זמין"
+          commits      = open("/tmp/commits.txt").read()           or "אין commits השבוע"
+          files        = open("/tmp/files.txt").read()             or "אין שינויי קבצים"
+          diff         = open("/tmp/diff.txt").read()              or "אין diff זמין"
+          new_files    = open("/tmp/new_files_content.txt").read() or ""
 
           prompt = f"""אתה עוזר שכותב מיילים בשם מפתח תוכנה לבוס שלו, בעברית מקצועית.
 
@@ -69,15 +89,16 @@ jobs:
           - לא להשתמש בביטויים כמו "מפתח הפרויקט", "מנהל הפרויקט", "בכבוד רב"
           - לכתוב בגוף ראשון
 
-          לגבי התוכן — כתוב כמה שיותר מפורט ומעמיק:
+          לגבי התוכן — חשוב מאוד:
+          - אם נוספו קבצים חדשים — זה הדבר הכי חשוב לציין! הסבר מה הם עושים, מה תפקידם במערכת,
+            ומה המשמעות הארכיטקטורלית שלהם (למשל: נוסף צד לקוח, נוסף מודול חדש, נוסף API וכו')
           - עבור כל commit — הסבר מה בוצע, למה זה חשוב ומה ההשפעה שלו
-          - עבור כל קובץ שהשתנה — הסבר מה בדיוק השתנה, מדוע ומה זה משפר
-          - אם נוסף קובץ חדש — הסבר את תפקידו
+          - עבור כל קובץ שהשתנה — הסבר מה בדיוק השתנה ומדוע
           - נתח אתגרים טכניים שעולים מהקוד ואיך טופלו
           - פרט סטטוס נוכחי וצעדים הבאים
-          - כתוב רק דברים שיש לך בסיס לכתוב עליהם
+          - כתוב רק דברים שיש לך בסיס לכתוב עליהם — אל תמציא
 
-          החזר את התשובה בפורמט הבא בדיוק — שתי שורות ראשונות הן הנושא, אחריהן שורה עם ---BODY--- ואחריה גוף המייל:
+          החזר את התשובה בפורמט הבא בדיוק:
 
           SUBJECT: נושא המייל כאן
           ---BODY---
@@ -90,13 +111,16 @@ jobs:
           מספר commits: {os.environ['COMMIT_COUNT']}
 
           === Commits ===
-          {commits[:3000]}
+          {commits[:2000]}
 
-          === קבצים שהשתנו ===
-          {files[:1500]}
+          === כל הקבצים שהשתנו ===
+          {files[:2000]}
 
-          === תוכן השינויים בקוד (diff) ===
-          {diff[:4000]}
+          === תוכן קבצים חדשים שנוספו ===
+          {new_files[:3000]}
+
+          === diff של שינויים בקבצים קיימים ===
+          {diff[:3000]}
           """
 
           client = Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -108,15 +132,12 @@ jobs:
 
           text = response.choices[0].message.content.strip()
 
-          # חלץ subject ו-body לפי delimiter
           if "---BODY---" in text:
               parts = text.split("---BODY---", 1)
               subject_line = parts[0].strip()
               body = parts[1].strip()
-              # נקה SUBJECT: מהתחלה אם יש
               subject = re.sub(r'^SUBJECT:\s*', '', subject_line, flags=re.IGNORECASE).strip()
           else:
-              # fallback — שורה ראשונה היא הנושא, השאר הגוף
               lines = text.splitlines()
               subject = re.sub(r'^SUBJECT:\s*', '', lines[0], flags=re.IGNORECASE).strip()
               body = "\n".join(lines[1:]).strip()
