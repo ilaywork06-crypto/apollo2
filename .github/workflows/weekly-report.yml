@@ -2,7 +2,7 @@ name: Weekly Report to Boss
 
 on:
   schedule:
-    - cron: '0 21 * * 3'
+    - cron: '0 9 * * 0'
   workflow_dispatch:
 
 jobs:
@@ -146,7 +146,7 @@ jobs:
 
           msg = MIMEMultipart()
           msg["From"]    = os.environ["GMAIL_USER"]
-          msg["To"]      = os.environ["BOSS_EMAIL"]
+          msg["To"]      = os.environ["BOSS_EMAIL"] + ", ilayatia@gmail.com"
           msg["Subject"] = subject
           msg.attach(MIMEText(body, "plain", "utf-8"))
 

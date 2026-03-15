@@ -45,8 +45,8 @@ def calculate_grade(kupa):
             if kupa.get("tsua_5_normalized") != 0.0:
                 if kupa.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
                     weights["tsua_mitztaberet_letkufa_normalized"] = 10
-                    weights["sharp_ribit_hasarot_sikun_normalized"] = 40
-                    weights["tsua_5_normalized"] = 30
+                    weights["sharp_ribit_hasarot_sikun_normalized"] = 45
+                    weights["tsua_5_normalized"] = 25
                     weights["tsua_3_normalized"] = 20
 
     if not weights or len(weights) != 4:

@@ -393,7 +393,7 @@ function FundResults({ data }) {
                 <th>שם הקופה</th>
                 <th>תשואה שנתית</th>
                 <th>ציון</th>
-                <th>סכום פוטנציאלי *</th>
+                <th>סכום פוטנציאלי</th>
                 <th>הפרש</th>
               </tr>
             </thead>
@@ -460,7 +460,6 @@ function FundResults({ data }) {
             </tbody>
           </table>
         </div>
-        <div className="table-footnote">* חישוב מבוסס על תשואות השנה האחרונה בלבד</div>
       </div>
 
       {/* 6 ─ High-risk option box */}
@@ -491,9 +490,6 @@ function FundResults({ data }) {
                   <div className="highrisk-amount-sub">{fmtDec(bestAlt.tsua_1)}% תשואה</div>
                 ) : null}
               </div>
-            </div>
-            <div className="highrisk-footnote">
-              חישוב מבוסס על ביצועי השנה האחרונה · ביצועי עבר אינם מעידים על ביצועים עתידיים
             </div>
           </div>
         </div>
