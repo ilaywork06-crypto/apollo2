@@ -6,6 +6,14 @@ def extract_data_from_xml(field_name, row, field_type=str):
         return field_type(data.text)
     return "N/A" if field_type == str else 0.0
 
+def parse_multible_mislaka_files(files):
+    mother_list = []
+    for file in files:
+        child_list = parse_mislaka_file(file)
+        for one in child_list:
+            mother_list.append(one)
+    return mother_list
+
 def parse_mislaka_file(content):
     list_of_kupot = []
     root = ET.fromstring(content)
@@ -28,9 +36,11 @@ def parse_mislaka_file(content):
                     break
 
             SHEUR_DMEI_NIHUL_HAFKADA = extract_data_from_xml('.//SHEUR-DMEI-NIHUL-HAFKADA', polisa, float)
-
+            kod_maslul = "fr"
+            if KOD_MASLUL_HASHKAA[-6:] != 'N/A':
+                kod_maslul = str(int(KOD_MASLUL_HASHKAA[-6:])).strip()
             list_of_kupot.append({
-                "GEMELNET_ID": str(int(KOD_MASLUL_HASHKAA[-6:])).strip(),
+                "GEMELNET_ID": kod_maslul,
     "SHEM-TOCHNIT": SHEM_TOCHNIT.strip(),
     "TAARICH-HITZTARFUT-MUTZAR": TAARICH_HITZTARFUT_MUTZAR.strip(),
     "TOTAL-CHISACHON-MTZBR": TOTAL_CHISACHON_MTZBR,

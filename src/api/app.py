@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File
 from src.engines.engine import run_comparison
 APP = FastAPI()
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,12 +12,14 @@ APP.add_middleware(
 )
 @APP.post("/compare")
 async def compare(
+    weight_1:int = Form(),
+    weight_3:int  = Form(), 
+    weight_5:int = Form(),
+    weight_sharp:int = Form(),
     mislaka_file: UploadFile = File(...),
-    gemelnet_file: UploadFile = File(...)
     ):
     mislaka_content = (await mislaka_file.read()).decode('utf-8-sig')
-    gemelnet_content = (await gemelnet_file.read()).decode('utf-8-sig')
-    content = run_comparison(gemel_net_file=gemelnet_content,mislaka_file=mislaka_content)
+    content = run_comparison(mislaka_file=mislaka_content, weight_1 = weight_1, weight_3 = weight_3, weight_5 = weight_5, weight_sharp = weight_sharp)
     return content
 
 @APP.get("/health")

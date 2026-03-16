@@ -166,9 +166,18 @@ body::before {
 /* Upload zones */
 .upload-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
+  /* This automatically wraps items when they get smaller than 280px */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  
+  /* Centering the grid itself */
+  width: 100%;
+  max-width: 300px; 
+  margin: 0 auto 24px auto; /* Centered with bottom margin */
+  
+  /* Alignment of content inside */
+  align-items: start; 
+  justify-content: center;
 }
 
 @media (max-width: 580px) {

@@ -1,16 +1,6 @@
 import xml.etree.ElementTree as ET
 
-RISK_LEVELS = {
-    "low": {'אג"ח', 'אג"ח ממשלות', 'אג"ח סחיר', 'אג"ח ללא מניות', 'אשראי ואג"ח', 'כספי (שקלי)', 'מדד ללא מניות', 'עוקב מדדי אג"ח'},
-    "medium": {'כללי', 'משולב סחיר', 'קיימות', 'הלכה יהודית',  'הלכה איסלאמית'},
-    "high": {'מניות', 'מניות סחיר','עוקב מדדים - גמיש',  'עוקב מדדי מניות', 'חו"ל', 'עוקב מדד s&p 500' }
-}
-
-def get_risk_level(hitmahut_mishnit):
-    for level, types in RISK_LEVELS.items():
-        if hitmahut_mishnit in types:
-            return level
-    return "unknown"
+from src.parsers.risk_level_generator import get_risk_level
 
 def extract_data_from_xml(field_name, row, field_type=str):
     data = row.find(field_name)
@@ -20,7 +10,8 @@ def extract_data_from_xml(field_name, row, field_type=str):
 
 def parse_xml_file(content):
     list_of_kupot = []
-    root = ET.fromstring(content)
+    hey = ET.parse(content)
+    root = hey.getroot()
     for row in root.findall('Row'):
         SUG_KUPA = extract_data_from_xml('SUG_KUPA', row)
         if SUG_KUPA != 'קופת גמל להשקעה':
@@ -33,7 +24,7 @@ def parse_xml_file(content):
         NUM_HEVRA = extract_data_from_xml('NUM_HEVRA', row)
         TSUA_SHNATIT_MEMUZAAT_3_SHANIM = extract_data_from_xml('TSUA_SHNATIT_MEMUZAAT_3_SHANIM', row, float)
         TSUA_SHNATIT_MEMUZAAT_5_SHANIM = extract_data_from_xml('TSUA_SHNATIT_MEMUZAAT_5_SHANIM', row, float)
-        RISK_LEVEL = get_risk_level(HITMAHUT_MISHNIT.strip())
+        RISK_LEVEL = get_risk_level(int(ID))
         TSUA_MITZTABERET_LETKUFA = extract_data_from_xml('TSUA_MITZTABERET_LETKUFA', row, float)
         SHARP_RIBIT_HASRAT_SIKUN = extract_data_from_xml('SHARP_RIBIT_HASRAT_SIKUN', row, float)
 

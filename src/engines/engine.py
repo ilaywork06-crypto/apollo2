@@ -1,3 +1,4 @@
+from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
 from src.parsers.mislaka_parser import parse_mislaka_file
 from src.parsers.parser import parse_xml_file
 import json
@@ -37,17 +38,17 @@ def normalize_data(kupot_list):
             else:
                 kupa[field + "_normalized"] = 0.0
 
-def calculate_grade(kupa):
+def calculate_grade(kupa, weight_1 , weight_3 , weight_5, weight_sharp):
     weights = {}
 
     if kupa.get("tsua_mitztaberet_letkufa_normalized") != 0.0:
         if kupa.get("tsua_3_normalized") != 0.0:
             if kupa.get("tsua_5_normalized") != 0.0:
                 if kupa.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
-                    weights["tsua_mitztaberet_letkufa_normalized"] = 10
-                    weights["sharp_ribit_hasarot_sikun_normalized"] = 45
-                    weights["tsua_5_normalized"] = 25
-                    weights["tsua_3_normalized"] = 20
+                    weights["tsua_mitztaberet_letkufa_normalized"] = weight_1
+                    weights["sharp_ribit_hasarot_sikun_normalized"] = weight_sharp
+                    weights["tsua_5_normalized"] = weight_5
+                    weights["tsua_3_normalized"] = weight_3
 
     if not weights or len(weights) != 4:
         return 0
@@ -59,9 +60,9 @@ def calculate_grade(kupa):
 
     return round(grade, 2)
 
-def add_grade_and_sort(kupot_list):
+def add_grade_and_sort(kupot_list, weight_1, weight_3, weight_5, weight_sharp):
     for kupa in kupot_list:
-        kupa["grade"] = calculate_grade(kupa)
+        kupa["grade"] = calculate_grade(kupa, weight_1, weight_3, weight_5, weight_sharp)
 
     return sorted(kupot_list, key=lambda x: x["grade"], reverse=True)
 
@@ -79,9 +80,11 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     potential = current_amount * (1 + diff / 100)
     return round(potential, 2)
 
-def run_comparison(gemel_net_file, mislaka_file):
+def run_comparison(mislaka_file, weight_1, weight_3 , weight_5 , weight_sharp ):
+    get_stocks_percentage_by_kupa_id("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/risks.xml"
+                                 )
     funds_list = []
-    kupot_list = parse_xml_file(gemel_net_file)
+    kupot_list = parse_xml_file("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/gemelnet.xml")
     mislaka_list = parse_mislaka_file(mislaka_file)
     matches = find_matching_kupot(mislaka_list, kupot_list)
     output = []
@@ -92,7 +95,7 @@ def run_comparison(gemel_net_file, mislaka_file):
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
         adjusted_kupot = apply_dmey_nihul(copy.deepcopy(all_kopot_in_risk_level), dmey_nihul)
         normalize_data(adjusted_kupot)
-        sorted_kupot = add_grade_and_sort(adjusted_kupot)   
+        sorted_kupot = add_grade_and_sort(adjusted_kupot, weight_1, weight_3, weight_5 , weight_sharp )   
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
         

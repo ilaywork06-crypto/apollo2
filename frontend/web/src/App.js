@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import './App.css';
 
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const LOADING_STEPS = [
@@ -160,14 +161,7 @@ function UploadScreen({ mislakaFile, gemelnetFile, onMislaka, onGemelnet, onAnal
             file={mislakaFile}
             onFile={onMislaka}
           />
-          <UploadZone
-            label="קובץ תשואות — גמל נט"
-            subtitle="XML — תשואות שנתיות ברוטו"
-            file={gemelnetFile}
-            onFile={onGemelnet}
-          />
         </div>
-
         <div className="product-box">
           <div className="product-box-label">סוג מוצר להשוואה</div>
           <div className="product-tags">
@@ -557,12 +551,16 @@ function App() {
 
     try {
       const formData = new FormData();
+      formData.append('weight_1', 100);
+      formData.append('weight_3', 0);
+      formData.append('weight_5', 0);
+      formData.append('weight_sharp', 0);
       formData.append('mislaka_file', mislakaFile);
-      formData.append('gemelnet_file', gemelnetFile);
       const res = await fetch('http://localhost:8000/compare', {
         method: 'POST',
         body: formData,
       });
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       clearInterval(interval);
