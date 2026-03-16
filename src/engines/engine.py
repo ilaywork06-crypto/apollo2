@@ -1,5 +1,5 @@
 from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
-from src.parsers.mislaka_parser import parse_mislaka_file
+from src.parsers.mislaka_parser import parse_mislaka_file, parse_multible_mislaka_files
 from src.parsers.parser import parse_xml_file
 import json
 import copy
@@ -85,7 +85,7 @@ def run_comparison(mislaka_file, weight_1, weight_3 , weight_5 , weight_sharp ):
                                  )
     funds_list = []
     kupot_list = parse_xml_file("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/gemelnet.xml")
-    mislaka_list = parse_mislaka_file(mislaka_file)
+    mislaka_list = parse_multible_mislaka_files(mislaka_file)
     matches = find_matching_kupot(mislaka_list, kupot_list)
     output = []
     for mislaka, kupa in matches:

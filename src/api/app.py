@@ -1,3 +1,5 @@
+from typing import List
+
 import uvicorn
 from fastapi import FastAPI, Form, UploadFile, File
 from src.engines.engine import run_comparison
@@ -16,10 +18,13 @@ async def compare(
     weight_3:int  = Form(), 
     weight_5:int = Form(),
     weight_sharp:int = Form(),
-    mislaka_file: UploadFile = File(...),
+    mislaka_file: List[UploadFile] = File(...),
     ):
-    mislaka_content = (await mislaka_file.read()).decode('utf-8-sig')
-    content = run_comparison(mislaka_file=mislaka_content, weight_1 = weight_1, weight_3 = weight_3, weight_5 = weight_5, weight_sharp = weight_sharp)
+    l_con = []
+    for file in mislaka_file:
+        mislaka_content = (await file.read()).decode('utf-8-sig')
+        l_con.append(mislaka_content)
+    content = run_comparison(mislaka_file=l_con, weight_1 = weight_1, weight_3 = weight_3, weight_5 = weight_5, weight_sharp = weight_sharp)
     return content
 
 @APP.get("/health")
