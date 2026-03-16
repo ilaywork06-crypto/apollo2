@@ -141,8 +141,8 @@ function UploadZone({ label, subtitle, file, onFile }) {
 
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFile, gemelnetFile, onMislaka, onGemelnet, onAnalyze }) {
-  const ready = mislakaFile && gemelnetFile;
+function UploadScreen({ mislakaFile, onMislaka, onAnalyze }) {
+  const ready = mislakaFile;
   return (
     <div className="screen screen--upload">
       <Header />
