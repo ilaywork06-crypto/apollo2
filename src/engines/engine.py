@@ -81,10 +81,10 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     return round(potential, 2)
 
 def run_comparison(mislaka_file, weight_1, weight_3 , weight_5 , weight_sharp ):
-    get_stocks_percentage_by_kupa_id("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/risks.xml"
+    get_stocks_percentage_by_kupa_id("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/risks_map.xml"
                                  )
     funds_list = []
-    kupot_list = parse_xml_file("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/gemelnet.xml")
+    kupot_list = parse_xml_file("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/kupot_gemel_net.xml")
     mislaka_list = parse_multible_mislaka_files(mislaka_file)
     matches = find_matching_kupot(mislaka_list, kupot_list)
     output = []
