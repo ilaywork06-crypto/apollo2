@@ -1,6 +1,11 @@
+# ----- Imports ----- #
+
 import xml.etree.ElementTree as ET
 
+
 RISKS_DICT = {}
+
+# ----- Functions ----- #
 
 
 def get_risk_level(kupa_id):

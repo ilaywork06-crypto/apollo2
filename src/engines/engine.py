@@ -1,12 +1,20 @@
+# ----- Imports ----- #
+
 from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
 from src.parsers.mislaka_parser import parse_multible_mislaka_files
 from src.parsers.parser import parse_xml_file
 import copy
 
+
 GEMEL_NET_PATH = (
     "/Users/msphttyh/Documents/apolo/apollo2/src/engines/kupot_gemel_net.xml"
 )
+
+# ----- Constants ----- #
+
 RISKS_MAP_PATH = "/Users/msphttyh/Documents/apolo/apollo2/src/engines/risks_map.xml"
+
+# ----- Functions ----- #
 
 
 def find_matching_kupot(mislaka_list, kupot_list):
@@ -56,7 +64,13 @@ def normalize_data(kupot_list):
                 kupa[field + "_normalized"] = 0.0
 
 
-def calculate_grade(kupa, weight_1, weight_3, weight_5, weight_sharp):
+def calculate_grade(
+    kupa,
+    weight_1,
+    weight_3,
+    weight_5,
+    weight_sharp,
+    ):
     weights = {}
 
     if kupa.get("tsua_mitztaberet_letkufa_normalized") != 0.0:
@@ -79,7 +93,13 @@ def calculate_grade(kupa, weight_1, weight_3, weight_5, weight_sharp):
     return round(grade, 2)
 
 
-def add_grade_and_sort(kupot_list, weight_1, weight_3, weight_5, weight_sharp):
+def add_grade_and_sort(
+    kupot_list,
+    weight_1,
+    weight_3,
+    weight_5,
+    weight_sharp,
+    ):
     for kupa in kupot_list:
         kupa["grade"] = calculate_grade(
             kupa, weight_1, weight_3, weight_5, weight_sharp
@@ -108,7 +128,13 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     return round(potential, 2)
 
 
-def run_comparison(mislaka_file, weight_1, weight_3, weight_5, weight_sharp):
+def run_comparison(
+    mislaka_file,
+    weight_1,
+    weight_3,
+    weight_5,
+    weight_sharp,
+    ):
     get_stocks_percentage_by_kupa_id(RISKS_MAP_PATH)
     funds_list = []
     kupot_list = parse_xml_file(GEMEL_NET_PATH)

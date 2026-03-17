@@ -1,6 +1,10 @@
+# ----- Imports ----- #
+
 import xml.etree.ElementTree as ET
 
 from src.parsers.risk_level_generator import get_risk_level
+
+# ----- Functions ----- #
 
 
 def extract_data_from_xml(field_name, row, field_type=str):

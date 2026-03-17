@@ -1,5 +1,9 @@
+# ----- Imports ----- #
+
 import lxml.etree as ET
 import re
+
+# ----- Functions ----- #
 
 
 def extract_data_from_xml(field_name, row, field_type=str):

@@ -1,10 +1,14 @@
+# ----- Imports ----- #
+
 from typing import List
 
+# כל הקופות נתותים כללים לשנה וחלוקה לקבוצות ראשיות לחודש ב15 לחודש?
 # בג apollo2 % python3 -m src.api.app
 import uvicorn
 from fastapi import FastAPI, Form, UploadFile, File
 from src.engines.engine import run_comparison
 from fastapi.middleware.cors import CORSMiddleware
+
 
 APP = FastAPI()
 
@@ -16,6 +20,8 @@ APP.add_middleware(
     allow_headers=["*"],
 )
 
+# ----- Functions ----- #
+
 
 @APP.post("/compare")
 async def compare(
@@ -24,7 +30,7 @@ async def compare(
     weight_5: int = Form(),
     weight_sharp: int = Form(),
     mislaka_file: List[UploadFile] = File(...),
-):
+    ):
     l_con = []
     for file in mislaka_file:
         mislaka_content = (await file.read()).decode("utf-8-sig")
