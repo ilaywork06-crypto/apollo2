@@ -1,5 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import './App.css';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -722,10 +724,271 @@ function FundResults({ data, weights }) {
   );
 }
 
+// ─── PDF Generator ────────────────────────────────────────────────────────────
+
+// Colors matching the app
+const PDF_BLUE   = '#3B82F6';
+const PDF_PURPLE = '#8B5CF6';
+const PDF_DARK   = '#0F172A';
+const PDF_TEXT   = '#1E293B';
+const PDF_MUTED  = '#64748B';
+
+async function captureElement(html) {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position: absolute; top: 0; left: -9999px;
+    width: 794px; background: #ffffff;
+    direction: rtl; font-family: Arial, Helvetica, sans-serif;
+    color: ${PDF_TEXT}; padding: 40px 48px; box-sizing: border-box;
+  `;
+  el.innerHTML = html;
+  document.body.appendChild(el);
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try {
+    return await html2canvas(el, {
+      scale: 2, backgroundColor: '#ffffff',
+      useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 794,
+    });
+  } finally {
+    document.body.removeChild(el);
+  }
+}
+
+function pdfHeader(today) {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:24px;padding-bottom:16px;
+      border-bottom:2px solid ${PDF_BLUE};">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:46px;height:46px;border-radius:12px;
+          background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});
+          display:flex;align-items:center;justify-content:center;">
+          <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+            <path d="M4 16 C8 9,24 9,28 16 C24 23,8 23,4 16Z"
+              fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+            <circle cx="16" cy="16" r="4.5" fill="rgba(255,255,255,0.9)"/>
+            <polyline points="7,18 10,15 13,17 16,13 19,15 22,11 25,13"
+              stroke="white" stroke-width="1.4" fill="none"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;
+            background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+            AmoSight
+          </div>
+          <div style="font-size:11px;color:${PDF_MUTED};">ניתוח והשוואת קופות גמל</div>
+        </div>
+      </div>
+      <div style="text-align:left;color:${PDF_MUTED};font-size:11px;line-height:1.6;">
+        <div>דוח הופק: ${today}</div>
+        <div>AmoSight Report</div>
+      </div>
+    </div>`;
+}
+
+function pdfFooter(pageNum, total) {
+  return `
+    <div style="margin-top:24px;padding-top:12px;border-top:1px solid #E2E8F0;
+      display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:10px;color:${PDF_MUTED};">
+        הנתונים מבוססים על מידע מהמסלקה הפנסיונית ומגמל נט · אין לראות בכך ייעוץ השקעות
+      </div>
+      <div style="font-size:10px;color:${PDF_MUTED};">עמוד ${pageNum} מתוך ${total}</div>
+    </div>`;
+}
+
+async function generatePDF(funds, weights) {
+  const today = new Date().toLocaleDateString('he-IL');
+  const fmtN = n => Math.round(n).toLocaleString('he-IL');
+  const fmtD = (n, d = 1) => n != null ? (+n).toFixed(d) : '—';
+  const riskMap = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
+  const totalPages = 1 + funds.length; // cover + one per fund
+
+  // ── Page 1: Cover with weights ──────────────────────────────────────────────
+  const coverHTML = `
+    ${pdfHeader(today)}
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:800;color:${PDF_DARK};margin-bottom:6px;">
+        דוח השוואת קופות גמל
+      </div>
+      <div style="font-size:13px;color:${PDF_MUTED};">
+        ${funds.length} קופ${funds.length === 1 ? 'ה' : 'ות'} נותחו בדוח זה
+      </div>
+    </div>
+
+    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;
+      padding:20px 24px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:700;color:${PDF_BLUE};margin-bottom:14px;">
+        פרמטרי החישוב — AmoScore
+      </div>
+      <div style="display:flex;gap:16px;">
+        ${[
+          ['תשואה שנה',     weights.w1],
+          ['תשואה 3 שנים',  weights.w3],
+          ['תשואה 5 שנים',  weights.w5],
+          ['Sharp Ratio',   weights.wSharp],
+        ].map(([label, val]) => `
+          <div style="flex:1;text-align:center;background:#fff;border:1px solid #DBEAFE;
+            border-radius:10px;padding:14px 10px;">
+            <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:6px;">${label}</div>
+            <div style="font-size:22px;font-weight:800;color:${PDF_BLUE};">${val}%</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:18px 24px;">
+      <div style="font-size:12px;font-weight:700;color:${PDF_MUTED};margin-bottom:8px;
+        text-transform:uppercase;letter-spacing:0.06em;">כיצד מחושב AmoScore?</div>
+      <div style="font-size:12px;color:${PDF_MUTED};line-height:1.7;">
+        AmoScore מחושב על בסיס 4 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, ו-Sharp Ratio.
+        כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה,
+        ולאחר מכן מוכפל במשקל שנבחר. הציון הסופי הוא הסכום המשוקלל.
+      </div>
+    </div>
+
+    ${pdfFooter(1, totalPages)}`;
+
+  // ── Per-fund pages ──────────────────────────────────────────────────────────
+  const fundPages = funds.map(({ client, alternatives }, fi) => {
+    const clientIsTop3 = client.rank != null && client.rank <= 3;
+    const allRows = [
+      { ...client, isClient: true, potential_amount: client.amount, diff: null },
+      ...alternatives.map(a => ({ ...a, isClient: false })),
+    ].sort((a, b) => (b.grade ?? 0) - (a.grade ?? 0));
+
+    const rowsHTML = allRows.map((f, idx) => {
+      let bg = idx % 2 === 0 ? '#ffffff' : '#F8FAFC';
+      if (f.isClient) bg = clientIsTop3 ? '#EFF6FF' : '#FEF2F2';
+      const clientColor = clientIsTop3 ? PDF_BLUE : '#EF4444';
+
+      return `
+        <tr style="background:${bg};">
+          <td style="padding:9px 12px;font-weight:600;color:${PDF_TEXT};">
+            ${f.isClient ? `<span style="color:${clientColor};font-weight:800;">${f.rank ?? idx+1}</span>`
+                         : idx + 1}
+            ${idx < 3 && !f.isClient
+              ? `<span style="background:#EFF6FF;color:${PDF_BLUE};font-size:9px;
+                  font-weight:700;padding:2px 6px;border-radius:8px;margin-right:4px;">מומלץ</span>`
+              : ''}
+          </td>
+          <td style="padding:9px 12px;color:${PDF_TEXT};font-weight:${f.isClient ? '700' : '400'};">
+            ${f.name}
+            ${f.isClient
+              ? `<span style="background:${clientIsTop3 ? '#EFF6FF' : '#FEF2F2'};
+                  color:${clientColor};font-size:9px;font-weight:700;
+                  padding:2px 6px;border-radius:8px;margin-right:6px;">הקופה שלך</span>`
+              : ''}
+          </td>
+          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};font-weight:600;">
+            ${f.grade ? fmtD(f.grade) : '–'}
+          </td>
+          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};">
+            ${f.tsua_1 != null ? fmtD(f.tsua_1) + '%' : '—'}
+          </td>
+          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};">
+            ${riskMap[client.risk_level] ?? '—'}
+          </td>
+          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};font-weight:600;">
+            ${f.potential_amount != null ? '₪' + fmtN(f.potential_amount) : '—'}
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      ${pdfHeader(today)}
+
+      <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;
+        padding:18px 22px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:600;color:${PDF_BLUE};
+          text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">פרטי הקופה</div>
+        <div style="font-size:20px;font-weight:800;color:${PDF_DARK};margin-bottom:8px;">
+          ${client.name}
+        </div>
+        <div style="font-size:12px;color:${PDF_MUTED};margin-bottom:14px;">
+          קופה #${client.id}
+          ${client.hevra ? ' · ' + client.hevra : ''}
+          ${client.risk_level ? ' · רמת סיכון: ' + (riskMap[client.risk_level] ?? client.risk_level) : ''}
+          ${client.rank != null ? ' · מקום ' + client.rank + ' מתוך ' + client.total_in_risk + ' קופות' : ''}
+        </div>
+        <div style="display:flex;gap:20px;">
+          ${[
+            ['סכום צבירה',     '₪' + fmtN(client.amount)],
+            ['תשואה שנתית',    client.tsua_1 ? fmtD(client.tsua_1) + '%' : 'N/A'],
+            ['AmoScore',       client.grade ? fmtD(client.grade) : '–'],
+            ['דמי ניהול',      client.dmei_nihul != null ? fmtD(client.dmei_nihul) + '%' : '—'],
+          ].map(([label, val]) => `
+            <div style="flex:1;background:#fff;border:1px solid #DBEAFE;
+              border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:4px;">${label}</div>
+              <div style="font-size:16px;font-weight:800;color:${PDF_DARK};">${val}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});">
+            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600;">דירוג</th>
+            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600;">שם הקופה</th>
+            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">AmoScore</th>
+            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">תשואה שנתית</th>
+            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">רמת סיכון</th>
+            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">סכום פוטנציאלי</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+      <div style="font-size:10px;color:${PDF_MUTED};margin-top:6px;">
+        * לא נוכו דמי ניהול חיצוניים מהחישוב
+      </div>
+
+      ${pdfFooter(fi + 2, totalPages)}`;
+  });
+
+  // ── Render all pages & build PDF ────────────────────────────────────────────
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageW = 210;
+  const pageH = 297;
+
+  const allPages = [coverHTML, ...fundPages];
+  for (let i = 0; i < allPages.length; i++) {
+    if (i > 0) pdf.addPage();
+    const canvas = await captureElement(allPages[i]);
+    const imgData = canvas.toDataURL('image/png');
+    const imgH = (canvas.height * pageW) / canvas.width;
+    // If content overflows one page, tile it
+    let y = 0;
+    while (y < imgH) {
+      if (y > 0) { pdf.addPage(); }
+      pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
+      y += pageH;
+    }
+  }
+
+  const dateStr = today.replace(/\//g, '-');
+  pdf.save(`AmoSight-${dateStr}.pdf`);
+}
+
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
 function ResultsScreen({ results, weights, onReset }) {
   const [selectedId, setSelectedId] = useState('all');
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setPdfLoading(true);
+    try {
+      await generatePDF(results || [], weights);
+    } catch (e) {
+      console.error('PDF Error:', e);
+      alert('שגיאה: ' + (e?.message ?? e));
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const filtered = selectedId === 'all'
     ? (results || [])
@@ -764,9 +1027,10 @@ function ResultsScreen({ results, weights, onReset }) {
         <div className="pdf-button-container">
           <button
             className="download-pdf-btn"
-            onClick={() => alert('בקרוב...')}
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading}
           >
-            📥 הורד דוח PDF
+            {pdfLoading ? '⏳ מפיק PDF...' : '📥 הורד דוח PDF'}
           </button>
         </div>
       </div>

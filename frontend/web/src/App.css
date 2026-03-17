@@ -122,8 +122,26 @@ body::before {
 .header-title {
   font-size: 20px;
   font-weight: 800;
-  color: var(--text-primary);
   line-height: 1.2;
+  background: linear-gradient(90deg,
+    #FF2200 0%,
+    #FF6600 15%,
+    #FFAA00 30%,
+    #38BDF8 50%,
+    #1E40AF 65%,
+    #FF6600 80%,
+    #FF2200 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 4s linear infinite;
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
 }
 
 .header-subtitle {
