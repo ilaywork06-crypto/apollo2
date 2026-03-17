@@ -144,6 +144,8 @@ def run_comparison(mislaka_file, weight_1, weight_3 , weight_5 , weight_sharp ):
 }
                 alternatives.append(alt)
                 kupa_rank += 1
+            else:
+                kupa_rank += 1
         funds_list.append({
         "client": client,
         "alternatives": alternatives

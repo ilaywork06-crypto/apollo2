@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import './App.css';
 
 
@@ -18,6 +18,18 @@ const ALT_GRADIENTS = [
   'linear-gradient(90deg,#8B5CF6,#A78BFA)',
 ];
 
+const RISK_LABELS = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
+const RISK_COLORS = { low: '#10B981', medium: '#3B82F6', high: '#F59E0B' };
+
+const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 45 };
+
+const WEIGHT_FIELDS = [
+  { field: 'w1',     label: 'תשואה שנה' },
+  { field: 'w3',     label: 'תשואה 3 שנים' },
+  { field: 'w5',     label: 'תשואה 5 שנים' },
+  { field: 'wSharp', label: 'Sharp Ratio' },
+];
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 const fmt = n => Math.round(n).toLocaleString('he-IL');
@@ -32,6 +44,40 @@ const formatDate = (dateStr) => {
   return `${day}/${month}/${year}`;
 };
 
+// ─── Stars Background ─────────────────────────────────────────────────────────
+
+function Stars() {
+  const stars = useMemo(() => Array.from({ length: 180 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: Math.random() * 1.8 + 0.4,
+    opacity: Math.random() * 0.6 + 0.2,
+    duration: Math.random() * 4 + 2,
+    delay: Math.random() * 4,
+  })), []);
+
+  return (
+    <div className="stars-bg" aria-hidden="true">
+      {stars.map(s => (
+        <div
+          key={s.id}
+          className="star"
+          style={{
+            left: `${s.x}%`,
+            top: `${s.y}%`,
+            width: `${s.size}px`,
+            height: `${s.size}px`,
+            opacity: s.opacity,
+            animationDuration: `${s.duration}s`,
+            animationDelay: `${s.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── Gauge SVG ────────────────────────────────────────────────────────────────
 
 function GaugeChart({ percentile, rank, total }) {
@@ -42,8 +88,8 @@ function GaugeChart({ percentile, rank, total }) {
   const cx = 65;
   const cy = 65;
 
-  const startX = cx - radius; // 13
-  const startY = cy;           // 65
+  const startX = cx - radius;
+  const startY = cy;
   const endX = cx + radius * Math.cos(Math.PI - angle);
   const endY = cy - radius * Math.sin(Math.PI - angle);
   const largeArc = angle > Math.PI ? 1 : 0;
@@ -100,9 +146,9 @@ function Header({ onReset }) {
           <div />
         )}
         <div className="header-brand">
-          <div className="header-logo">₪</div>
+          <div className="header-logo">A</div>
           <div className="header-text">
-            <span className="header-title">FundCompare</span>
+            <span className="header-title">AmoSight</span>
             <span className="header-subtitle">ניתוח והשוואת קופות גמל</span>
           </div>
         </div>
@@ -111,57 +157,160 @@ function Header({ onReset }) {
   );
 }
 
-// ─── Upload Zone ──────────────────────────────────────────────────────────────
+// ─── Weights Form ─────────────────────────────────────────────────────────────
 
-function UploadZone({ label, subtitle, file, onFile }) {
-  const inputRef = useRef();
+function WeightsForm({ weights, onChange }) {
+  const fields = WEIGHT_FIELDS.map(f => f.field);
+  const sum = fields.reduce((s, f) => s + weights[f], 0);
+  const isValid = sum === 100;
+
+  const handleStep = (idx, delta) => {
+    const next = { ...weights };
+    const target = fields[idx];
+    const newVal = next[target] + delta;
+    if (newVal < 0 || newVal > 100) return;
+
+    let remaining = delta;
+    let cursor = (idx + 1) % fields.length;
+    const visited = new Set([idx]);
+
+    while (remaining !== 0 && !visited.has(cursor)) {
+      visited.add(cursor);
+      const cur = next[fields[cursor]];
+      if (remaining > 0) {
+        const take = Math.min(remaining, cur);
+        next[fields[cursor]] -= take;
+        remaining -= take;
+      } else {
+        const give = Math.min(-remaining, 100 - cur);
+        next[fields[cursor]] += give;
+        remaining += give;
+      }
+      if (remaining !== 0) cursor = (cursor + 1) % fields.length;
+    }
+
+    if (remaining === 0) {
+      next[target] = newVal;
+      onChange(next);
+    }
+  };
+
   return (
-    <div
-      className={`upload-zone${file ? ' upload-zone--done' : ''}`}
-      onClick={() => inputRef.current.click()}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".xml"
-        style={{ display: 'none' }}
-        onChange={e => onFile(e.target.files[0])}
-      />
-      <div className={`upload-file-icon${file ? ' done' : ''}`}>
-        {file ? '✓' : '📄'}
+    <div className="weights-form">
+      <div className="weights-form-title">הגדרת משקלות לחישוב AmoScore</div>
+      <div className="weights-grid">
+        {WEIGHT_FIELDS.map(({ field, label }, idx) => (
+          <div key={field} className="weight-field">
+            <label className="weight-label">{label}</label>
+            <div className="weight-stepper">
+              <button className="weight-btn" onClick={() => handleStep(idx, -5)}>−</button>
+              <span className="weight-val">{weights[field]}%</span>
+              <button className="weight-btn" onClick={() => handleStep(idx, +5)}>+</button>
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="upload-label">{label}</div>
-      <div className="upload-sub">
-        {file ? `הקובץ נטען בהצלחה` : subtitle}
+      <div className={`weights-sum${isValid ? ' weights-sum--valid' : ' weights-sum--invalid'}`}>
+        סכום: <strong>{sum}</strong>/100
+        {isValid ? ' ✓' : ` — נדרש בדיוק 100 (${sum < 100 ? `חסרים ${100 - sum}` : `עודף ${sum - 100}`})`}
       </div>
-      {file && <div className="upload-filename">{file.name}</div>}
+    </div>
+  );
+}
+
+// ─── Multi Upload Zone ────────────────────────────────────────────────────────
+
+function MultiUploadZone({ files, onFiles, onRemoveFile }) {
+  const inputRef = useRef();
+
+  const handleChange = (e) => {
+    const newFiles = Array.from(e.target.files);
+    const valid = newFiles.filter(f => /\.(xml|dat)$/i.test(f.name));
+    const invalid = newFiles.filter(f => !/\.(xml|dat)$/i.test(f.name));
+    if (invalid.length > 0) {
+      alert(
+        `הקבצים הבאים אינם נתמכים:\n${invalid.map(f => f.name).join('\n')}\n\nניתן להעלות קבצי XML ו-DAT בלבד.`
+      );
+    }
+    if (valid.length > 0) {
+      onFiles([...files, ...valid]);
+    }
+    e.target.value = '';
+  };
+
+  const hasFiles = files.length > 0;
+
+  return (
+    <div className="multi-upload-wrap">
+      <div
+        className={`upload-zone${hasFiles ? ' upload-zone--done' : ''}`}
+        onClick={() => inputRef.current.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".xml,.dat"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleChange}
+        />
+        <div className={`upload-file-icon${hasFiles ? ' done' : ''}`}>
+          {hasFiles ? '✓' : '📄'}
+        </div>
+        <div className="upload-label">קבצי מסלקה פנסיונית</div>
+        <div className="upload-sub">
+          {hasFiles
+            ? files.length === 1 ? '1 קובץ נטען' : `${files.length} קבצים נטענו`
+            : 'לחץ לבחירת קבצי XML או DAT (ניתן לבחור מספר קבצים)'}
+        </div>
+      </div>
+      {hasFiles && (
+        <div className="file-list">
+          {files.map((f, i) => (
+            <div key={i} className="file-list-item">
+              <span className="file-list-name">📄 {f.name}</span>
+              <button
+                className="file-list-remove"
+                onClick={(e) => { e.stopPropagation(); onRemoveFile(i); }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFile, onMislaka, onAnalyze }) {
-  const ready = mislakaFile;
+function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, weights, onWeightsChange, onAnalyze }) {
+  const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
+  const ready = mislakaFiles.length > 0 && sum === 100;
+
   return (
     <div className="screen screen--upload">
+      <Stars />
       <Header />
       <div className="upload-content">
         <div className="hero">
           <h1 className="hero-title">בדוק את הביצועים של הקופה שלך</h1>
           <p className="hero-sub">
-            העלה את קבצי ה-XML מהמסלקה הפנסיונית ומגמל נט, וקבל ניתוח מקיף של ביצועי הקופה שלך מול השוק
+            העלה את קבצי ה-XML מהמסלקה הפנסיונית וקבל ניתוח מקיף של ביצועי הקופה שלך מול השוק
           </p>
         </div>
 
         <div className="upload-row">
-          <UploadZone
-            label="קובץ מסלקה פנסיונית"
-            subtitle="XML — פרטי קופה, סיכון, דמי ניהול"
-            file={mislakaFile}
-            onFile={onMislaka}
+          <MultiUploadZone
+            files={mislakaFiles}
+            onFiles={onMislakaFiles}
+            onRemoveFile={onRemoveMislakaFile}
           />
         </div>
+
+        <WeightsForm weights={weights} onChange={onWeightsChange} />
+
         <div className="product-box">
           <div className="product-box-label">סוג מוצר להשוואה</div>
           <div className="product-tags">
@@ -182,7 +331,7 @@ function UploadScreen({ mislakaFile, onMislaka, onAnalyze }) {
             <div className="info-icon">🏆</div>
             <div className="info-body">
               <div className="info-title">3 החלופות הטובות ביותר</div>
-              <div className="info-desc">הצגת 3 קופות עם תשואות גבוהות יותר</div>
+              <div className="info-desc">הצגת 3 קופות עם AmoScore גבוה יותר</div>
             </div>
           </div>
           <div className="info-card">
@@ -211,6 +360,7 @@ function UploadScreen({ mislakaFile, onMislaka, onAnalyze }) {
 function LoadingScreen({ step, progress }) {
   return (
     <div className="screen screen--loading">
+      <Stars />
       <Header />
       <div className="loading-content">
         <div className="loading-emoji">📊</div>
@@ -227,7 +377,7 @@ function LoadingScreen({ step, progress }) {
 
 // ─── Fund Results Section ─────────────────────────────────────────────────────
 
-function FundResults({ data }) {
+function FundResults({ data, weights }) {
   const { client, alternatives } = data;
   const isNew = client.grade === 0;
 
@@ -235,7 +385,7 @@ function FundResults({ data }) {
   const isBelow = !isNew && pct < 50;
   const isAbove = !isNew && pct >= 50;
 
-  // Bar chart: proportional to actual tsua_1 values (filter zeros for max)
+  // Bar chart: proportional to actual tsua_1 values
   const clientTsua1 = client.tsua_1 ?? 0;
   const allTsua = [client.tsua_1, ...alternatives.map(a => a.tsua_1)].filter(v => v > 0);
   const maxTsua = Math.max(...allTsua, 0.1);
@@ -243,6 +393,33 @@ function FundResults({ data }) {
   // Best alternative for high-risk section
   const bestAlt = alternatives[0];
   const diffPct = bestAlt?.diff_percent ?? 0;
+
+  // Risk display
+  const riskLabel = RISK_LABELS[client.risk_level] ?? client.risk_level ?? '—';
+  const riskColor = RISK_COLORS[client.risk_level] ?? '#94A3B8';
+
+  // Merge client + alternatives, sort by AmoScore descending
+  const clientEntry = {
+    ...client,
+    isClient: true,
+    potential_amount: client.amount,
+    diff: null,
+    diff_percent: null,
+  };
+  const sortedFunds = [
+    ...alternatives.map(a => ({ ...a, isClient: false })),
+    clientEntry,
+  ].sort((a, b) => (b.grade ?? 0) - (a.grade ?? 0));
+
+  // Assign colors: client green if rank 1-3, otherwise red; alts get ALT_COLORS in order
+  const clientIsTop = client.rank != null && client.rank <= 3;
+  let altColorIdx = 0;
+  const fundColors = sortedFunds.map(f => {
+    if (f.isClient) return clientIsTop ? '#10B981' : '#EF4444';
+    const color = ALT_COLORS[altColorIdx % ALT_COLORS.length];
+    altColorIdx++;
+    return color;
+  });
 
   return (
     <div className="fund-results fade-in fund-section">
@@ -259,9 +436,14 @@ function FundResults({ data }) {
             {client.total_in_risk != null && (
               <> · מקום {client.rank} מתוך {client.total_in_risk} קופות</>
             )}
+            {client.risk_level && (
+              <> · רמת סיכון: <strong style={{ color: riskColor }}>{riskLabel}</strong></>
+            )}
           </div>
         </div>
         <div className="gauge-container">
+          <div className="gauge-amoscore-label">AmoScore</div>
+          <div className="gauge-amoscore-value">{isNew || !client.grade ? '–' : fmtDec(client.grade)}</div>
           <GaugeChart
             percentile={pct}
             rank={client.rank}
@@ -344,7 +526,7 @@ function FundResults({ data }) {
             <div className="bar-label">{shortName(client.name)}</div>
             <div className="bar-track">
               <div
-                className="bar-fill bar-fill--red"
+                className="bar-fill bar-fill--client"
                 style={{ width: clientTsua1 > 0 ? `${(clientTsua1 / maxTsua) * 100}%` : '5%' }}
               >
                 <span className="bar-pct">
@@ -376,9 +558,9 @@ function FundResults({ data }) {
         </div>
       </div>
 
-      {/* 5 ─ Alternatives Table */}
+      {/* 5 ─ Alternatives Table — sorted by AmoScore */}
       <div className="table-card">
-        <div className="table-title">🏆 3 החלופות הטובות ביותר</div>
+        <div className="table-title">🏆 השוואת קופות לפי AmoScore</div>
         <div className="table-wrap">
           <table className="alts-table">
             <thead>
@@ -386,45 +568,60 @@ function FundResults({ data }) {
                 <th>דירוג</th>
                 <th>שם הקופה</th>
                 <th>תשואה שנתית</th>
-                <th>ציון</th>
-                <th>סכום פוטנציאלי</th>
+                <th>AmoScore</th>
+                <th>סכום פוטנציאלי *</th>
                 <th>הפרש</th>
               </tr>
             </thead>
             <tbody>
-              {alternatives.map((alt, i) => {
-                const diffNeg = alt.diff < 0;
+              {sortedFunds.map((fund, idx) => {
+                const color = fundColors[idx];
+                const diffNeg = fund.diff != null && fund.diff < 0;
                 return (
-                  <tr key={alt.id} className="row-alt">
+                  <tr key={fund.id} className={fund.isClient ? (clientIsTop ? 'row-client' : 'row-client row-client--bad') : 'row-alt'}>
                     <td>
-                      <span className="rank-badge" style={{ background: ALT_COLORS[i] }}>
-                        {alt.rank}
+                      <span
+                        className="rank-badge"
+                        style={{
+                          background: `${color}33`,
+                          color: color,
+                        }}
+                      >
+                        {fund.isClient ? (fund.rank ?? '–') : idx + 1}
                       </span>
                     </td>
                     <td className="td-name">
-                      <div>{alt.name}</div>
-                      {alt.hevra && <div className="td-name-sub">{alt.hevra}</div>}
-                      <div className="td-name-sub">קופה #{alt.id}</div>
+                      <div>{fund.name}</div>
+                      {fund.hevra && <div className="td-name-sub">{fund.hevra}</div>}
+                      <div className="td-name-sub">קופה #{fund.id}</div>
+                      {fund.isClient && (
+                        <div className={`td-name-tag ${clientIsTop ? 'td-name-tag--client' : 'td-name-tag--client-bad'}`}>הקופה שלך</div>
+                      )}
                     </td>
-                    <td className="td-return" style={{ color: ALT_COLORS[i] }}>
-                      {alt.tsua_1 != null ? `${fmtDec(alt.tsua_1)}%` : 'N/A'}
+                    <td className="td-return" style={{ color }}>
+                      {fund.tsua_1 != null ? `${fmtDec(fund.tsua_1)}%` : 'N/A'}
                     </td>
-                    <td className="td-score">{fmtDec(alt.grade)}</td>
+                    <td className="td-score">
+                      {fund.grade ? fmtDec(fund.grade) : '–'}
+                    </td>
                     <td className="td-potential">
-                      {alt.potential_amount != null ? `₪${fmt(alt.potential_amount)}` : '—'}
+                      {fund.potential_amount != null ? `₪${fmt(fund.potential_amount)}` : '—'}
                     </td>
                     <td className="td-diff">
-                      {alt.diff != null ? (
+                      {fund.diff != null ? (
                         <div>
                           <span
                             className="diff-badge"
-                            style={{ background: diffNeg ? 'rgba(239,68,68,0.15)' : undefined, color: diffNeg ? '#EF4444' : undefined }}
+                            style={{
+                              background: diffNeg ? 'rgba(239,68,68,0.15)' : undefined,
+                              color: diffNeg ? '#EF4444' : undefined,
+                            }}
                           >
-                            {diffNeg ? '' : '+'}₪{fmt(Math.abs(alt.diff))}
+                            {diffNeg ? '' : '+'}₪{fmt(Math.abs(fund.diff))}
                           </span>
-                          {alt.diff_percent != null && (
+                          {fund.diff_percent != null && (
                             <div className="diff-pct" style={{ color: diffNeg ? '#EF4444' : '#10B981' }}>
-                              {diffNeg ? '' : '+'}{fmtDec(alt.diff_percent)}%
+                              {diffNeg ? '' : '+'}{fmtDec(fund.diff_percent)}%
                             </div>
                           )}
                         </div>
@@ -433,26 +630,14 @@ function FundResults({ data }) {
                   </tr>
                 );
               })}
-              {/* Client row */}
-              <tr className="row-client">
-                <td>
-                  <span className="rank-badge rank-badge--client">{client.rank ?? '–'}</span>
-                </td>
-                <td className="td-name">
-                  <div>{client.name}</div>
-                  {client.hevra && <div className="td-name-sub">{client.hevra}</div>}
-                  <div className="td-name-sub">קופה #{client.id}</div>
-                  <div className="td-name-tag">הקופה שלך</div>
-                </td>
-                <td className="td-return" style={{ color: '#EF4444' }}>
-                  {client.tsua_1 ? `${fmtDec(client.tsua_1)}%` : 'N/A'}
-                </td>
-                <td className="td-score">{isNew || !client.grade ? '–' : fmtDec(client.grade)}</td>
-                <td className="td-potential">₪{fmt(client.amount)}</td>
-                <td className="td-diff">—</td>
-              </tr>
             </tbody>
           </table>
+        </div>
+        <div className="table-footnote">
+          * לא נוכו דמי ניהול חיצוניים מהחישוב
+        </div>
+        <div className="risk-note">
+          רמת הסיכון נקבעת על פי רמת החשיפה למניות בחודש האחרון
         </div>
       </div>
 
@@ -489,7 +674,25 @@ function FundResults({ data }) {
         </div>
       )}
 
-      {/* 7 ─ Disclaimer */}
+      {/* 7 ─ AmoScore Explanation */}
+      <div className="amoscore-explanation">
+        <div className="amoscore-explanation-title">כיצד מחושב AmoScore?</div>
+        <div className="amoscore-explanation-body">
+          <p>AmoScore מחושב על בסיס 4 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, ו-Sharp Ratio.</p>
+          <p>כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה. לאחר מכן כל פרמטר מוכפל במשקל שנבחר, והציון הסופי הוא הסכום המשוקלל של כל הפרמטרים.</p>
+          {weights && (
+            <p className="amoscore-weights-used">
+              החישוב בוצע עם המשקלות הבאים:
+              תשואה שנה {weights.w1}% ·
+              תשואה 3 שנים {weights.w3}% ·
+              תשואה 5 שנים {weights.w5}% ·
+              Sharp Ratio {weights.wSharp}%
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 8 ─ Disclaimer */}
       <div className="disclaimer">
         הנתונים מבוססים על מידע מהמסלקה הפנסיונית ומגמל נט של רשות שוק ההון · אין לראות בכך ייעוץ השקעות
       </div>
@@ -499,16 +702,43 @@ function FundResults({ data }) {
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
-function ResultsScreen({ results, onReset }) {
+function ResultsScreen({ results, weights, onReset }) {
+  const [selectedId, setSelectedId] = useState('all');
+
+  const filtered = selectedId === 'all'
+    ? (results || [])
+    : (results || []).filter(d => d.client?.id === selectedId);
+
   return (
     <div className="screen screen--results">
+      <Stars />
       <Header onReset={onReset} />
       <div id="results-content" className="results-content">
-        {(results || []).map((data, i) => (
+
+        {results && results.length > 1 && (
+          <div className="results-filter">
+            <label className="results-filter-label">הצג קופה:</label>
+            <select
+              className="results-filter-select"
+              value={selectedId}
+              onChange={e => setSelectedId(e.target.value)}
+            >
+              <option value="all">כל הקופות ({results.length})</option>
+              {results.map((d, i) => (
+                <option key={d.client?.id ?? i} value={d.client?.id}>
+                  #{d.client?.id} — {d.client?.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {filtered.map((data, i) => (
           <div key={(data.client?.id ?? i) + '-' + i}>
-            <FundResults data={data} />
+            <FundResults data={data} weights={weights} />
           </div>
         ))}
+
         <div className="pdf-button-container">
           <button
             className="download-pdf-btn"
@@ -526,11 +756,15 @@ function ResultsScreen({ results, onReset }) {
 
 function App() {
   const [screen, setScreen] = useState('upload');
-  const [mislakaFile, setMislakaFile] = useState(null);
-  const [gemelnetFile, setGemelnetFile] = useState(null);
+  const [mislakaFiles, setMislakaFiles] = useState([]);
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [results, setResults] = useState(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
+
+  const handleRemoveMislakaFile = (idx) => {
+    setMislakaFiles(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const handleAnalyze = async () => {
     setScreen('loading');
@@ -551,11 +785,12 @@ function App() {
 
     try {
       const formData = new FormData();
-      formData.append('weight_1', 100);
-      formData.append('weight_3', 0);
-      formData.append('weight_5', 0);
-      formData.append('weight_sharp', 0);
-      formData.append('mislaka_file', mislakaFile);
+      formData.append('weight_1', weights.w1);
+      formData.append('weight_3', weights.w3);
+      formData.append('weight_5', weights.w5);
+      formData.append('weight_sharp', weights.wSharp);
+      mislakaFiles.forEach(f => formData.append('mislaka_file', f));
+
       const res = await fetch('http://localhost:8000/compare', {
         method: 'POST',
         body: formData,
@@ -566,7 +801,6 @@ function App() {
       clearInterval(interval);
       setProgress(100);
       setTimeout(() => {
-        // New API returns { funds: [...] }
         const funds = data.funds ?? data;
         setResults(Array.isArray(funds) ? funds : [funds]);
         setScreen('results');
@@ -583,14 +817,15 @@ function App() {
     return <LoadingScreen step={loadingStep} progress={progress} />;
   }
   if (screen === 'results') {
-    return <ResultsScreen results={results} onReset={() => setScreen('upload')} />;
+    return <ResultsScreen results={results} weights={weights} onReset={() => setScreen('upload')} />;
   }
   return (
     <UploadScreen
-      mislakaFile={mislakaFile}
-      gemelnetFile={gemelnetFile}
-      onMislaka={setMislakaFile}
-      onGemelnet={setGemelnetFile}
+      mislakaFiles={mislakaFiles}
+      onMislakaFiles={setMislakaFiles}
+      onRemoveMislakaFile={handleRemoveMislakaFile}
+      weights={weights}
+      onWeightsChange={setWeights}
       onAnalyze={handleAnalyze}
     />
   );
