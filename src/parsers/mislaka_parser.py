@@ -26,22 +26,15 @@ def parse_mislaka_file(content):
         for polisa in row.iter('HeshbonOPolisa'):
             SHEM_TOCHNIT = extract_data_from_xml('.//SHEM-TOCHNIT', polisa)
             TAARICH_HITZTARFUT_MUTZAR = extract_data_from_xml('.//TAARICH-HITZTARFUT-MUTZAR', polisa)
-            
-            SHEUR_DMEI_NIHUL_TZVIRA = 0.0
-            for mivne in polisa.iter('PerutMivneDmeiNihul'):
-                sug = mivne.find('SUG-HOTZAA')
-                if sug is not None and sug.text == '1':
-                    sheur = mivne.find('SHEUR-DMEI-NIHUL')
-                    if sheur is not None and sheur.text:
-                        SHEUR_DMEI_NIHUL_TZVIRA = float(sheur.text)
-            SHEUR_DMEI_NIHUL_HAFKADA = extract_data_from_xml('.//SHEUR-DMEI-NIHUL-HAFKADA', polisa, float)
-            
+        
             maslulim = polisa.findall('.//PirteiTaktziv/PerutMasluleiHashkaa')
             if not maslulim:
                 maslulim = [polisa] 
             for maslul in maslulim:
                 SCHUM_TZVIRA_BAMASLUL = extract_data_from_xml('.//SCHUM-TZVIRA-BAMASLUL', maslul, float)
                 KOD_MASLUL_HASHKAA = extract_data_from_xml('.//KOD-MASLUL-HASHKAA', maslul)
+                SHEUR_DMEI_NIHUL_TZVIRA = extract_data_from_xml('.//SHEUR-DMEI-NIHUL-HISACHON-MIVNE', maslul, float)
+                SHEUR_DMEI_NIHUL_HAFKADA = extract_data_from_xml('.//SHEUR-DMEI-NIHUL-HAFKADA-MIVNE', polisa, float)
                 kod_maslul = "fr"
                 if KOD_MASLUL_HASHKAA[-6:] != 'N/A':
                     kod_maslul = str(int(KOD_MASLUL_HASHKAA[-6:])).strip()

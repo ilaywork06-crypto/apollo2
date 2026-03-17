@@ -526,7 +526,7 @@ function FundResults({ data, weights }) {
             <div className="bar-label">{shortName(client.name)}</div>
             <div className="bar-track">
               <div
-                className="bar-fill bar-fill--client"
+                className={`bar-fill ${clientIsTop ? 'bar-fill--client' : 'bar-fill--red'}`}
                 style={{ width: clientTsua1 > 0 ? `${(clientTsua1 / maxTsua) * 100}%` : '5%' }}
               >
                 <span className="bar-pct">
