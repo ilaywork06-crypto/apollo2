@@ -1,5 +1,5 @@
 from typing import List
-
+#בג apollo2 % python3 -m src.api.app
 import uvicorn
 from fastapi import FastAPI, Form, UploadFile, File
 from src.engines.engine import run_comparison
