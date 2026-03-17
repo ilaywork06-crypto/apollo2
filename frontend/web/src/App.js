@@ -495,7 +495,7 @@ function FundResults({ data, weights }) {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">דמי ניהול כוללים</div>
+          <div className="stat-label">דמי ניהול </div>
           <div className="stat-value">
             {client.dmei_nihul != null ? `${fmtDec(client.dmei_nihul)}%` : '—'}
           </div>
