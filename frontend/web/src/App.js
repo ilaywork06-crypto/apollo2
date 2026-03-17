@@ -146,7 +146,29 @@ function Header({ onReset }) {
           <div />
         )}
         <div className="header-brand">
-          <div className="header-logo">A</div>
+          <div className="header-logo">
+            <svg width="46" height="46" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#60A5FA"/>
+                  <stop offset="100%" stopColor="#A78BFA"/>
+                </linearGradient>
+                <linearGradient id="eyeGrad" x1="4" y1="16" x2="28" y2="16" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#fff" stopOpacity="0.15"/>
+                  <stop offset="100%" stopColor="#fff" stopOpacity="0.05"/>
+                </linearGradient>
+              </defs>
+              {/* Eye shape */}
+              <path d="M4 16 C8 9, 24 9, 28 16 C24 23, 8 23, 4 16 Z" fill="url(#eyeGrad)" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
+              {/* Pupil */}
+              <circle cx="16" cy="16" r="4.5" fill="url(#logoGrad)" opacity="0.9"/>
+              <circle cx="16" cy="16" r="2" fill="white" opacity="0.95"/>
+              {/* Chart line inside eye */}
+              <polyline points="7,18 10,15 13,17 16,13 19,15 22,11 25,13" stroke="url(#logoGrad)" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              {/* Top dot on chart */}
+              <circle cx="22" cy="11" r="1.3" fill="#A78BFA"/>
+            </svg>
+          </div>
           <div className="header-text">
             <span className="header-title">AmoSight</span>
             <span className="header-subtitle">ניתוח והשוואת קופות גמל</span>

@@ -3,7 +3,8 @@ from src.parsers.mislaka_parser import parse_mislaka_file, parse_multible_mislak
 from src.parsers.parser import parse_xml_file
 import json
 import copy
-
+GEMEL_NET_PATH = '/Users/msphttyh/Documents/apolo/apollo2/src/engines/kupot_gemel_net.xml'
+RISKS_MAP_PATH = '/Users/msphttyh/Documents/apolo/apollo2/src/engines/risks_map.xml'
 def find_matching_kupot(mislaka_list, kupot_list):
     matches = []
     for mislaka in mislaka_list:
@@ -81,10 +82,9 @@ def calculate_potential_amount(current_amount, current_kupa, better_kupa):
     return round(potential, 2)
 
 def run_comparison(mislaka_file, weight_1, weight_3 , weight_5 , weight_sharp ):
-    get_stocks_percentage_by_kupa_id("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/risks_map.xml"
-                                 )
+    get_stocks_percentage_by_kupa_id(RISKS_MAP_PATH)
     funds_list = []
-    kupot_list = parse_xml_file("/Users/msphttyh/Documents/apolo/apollo2/src/parsers/kupot_gemel_net.xml")
+    kupot_list = parse_xml_file(GEMEL_NET_PATH)
     mislaka_list = parse_multible_mislaka_files(mislaka_file)
     matches = find_matching_kupot(mislaka_list, kupot_list)
     output = []
