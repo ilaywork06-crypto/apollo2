@@ -7,7 +7,11 @@ from src.parsers.risk_level_generator import get_risk_level
 # ----- Functions ----- #
 
 
-def extract_data_from_xml(field_name, row, field_type=str):
+def extract_data_from_xml(
+    field_name,
+    row,
+    field_type=str,
+    ):
     data = row.find(field_name)
     if data is not None and data.text is not None:
         return field_type(data.text)
@@ -29,17 +33,25 @@ def parse_xml_file(content):
         HITMAHUT_MISHNIT = extract_data_from_xml("HITMAHUT_MISHNIT", row)
         NUM_HEVRA = extract_data_from_xml("NUM_HEVRA", row)
         TSUA_SHNATIT_MEMUZAAT_3_SHANIM = extract_data_from_xml(
-            "TSUA_SHNATIT_MEMUZAAT_3_SHANIM", row, float
+            "TSUA_SHNATIT_MEMUZAAT_3_SHANIM",
+            row,
+            float,
         )
         TSUA_SHNATIT_MEMUZAAT_5_SHANIM = extract_data_from_xml(
-            "TSUA_SHNATIT_MEMUZAAT_5_SHANIM", row, float
+            "TSUA_SHNATIT_MEMUZAAT_5_SHANIM",
+            row,
+            float,
         )
         RISK_LEVEL = get_risk_level(int(ID))
         TSUA_MITZTABERET_LETKUFA = extract_data_from_xml(
-            "TSUA_MITZTABERET_LETKUFA", row, float
+            "TSUA_MITZTABERET_LETKUFA",
+            row,
+            float,
         )
         SHARP_RIBIT_HASRAT_SIKUN = extract_data_from_xml(
-            "SHARP_RIBIT_HASRAT_SIKUN", row, float
+            "SHARP_RIBIT_HASRAT_SIKUN",
+            row,
+            float,
         )
 
         list_of_kupot.append(

@@ -1,16 +1,15 @@
 # ----- Imports ----- #
 
-from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
-from src.parsers.mislaka_parser import parse_multible_mislaka_files
-from src.parsers.parser import parse_xml_file
 import copy
 
-
-GEMEL_NET_PATH = (
-    "/Users/msphttyh/Documents/apolo/apollo2/src/engines/kupot_gemel_net.xml"
-)
+from src.parsers.mislaka_parser import parse_multible_mislaka_files
+from src.parsers.parser import parse_xml_file
+from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
 
 # ----- Constants ----- #
+
+GEMEL_NET_PATH = "/Users/msphttyh/Documents/apolo/apollo2/src/engines/kupot_gemel_net.xml"
+
 
 RISKS_MAP_PATH = "/Users/msphttyh/Documents/apolo/apollo2/src/engines/risks_map.xml"
 
@@ -102,10 +101,18 @@ def add_grade_and_sort(
     ):
     for kupa in kupot_list:
         kupa["grade"] = calculate_grade(
-            kupa, weight_1, weight_3, weight_5, weight_sharp
+            kupa,
+            weight_1,
+            weight_3,
+            weight_5,
+            weight_sharp,
         )
 
-    return sorted(kupot_list, key=lambda x: x["grade"], reverse=True)
+    return sorted(
+        kupot_list,
+        key=lambda x: x["grade"],
+        reverse=True,
+    )
 
 
 def get_top_3(sorted_kupot):
@@ -119,11 +126,12 @@ def get_client_ranking(sorted_kupot, client_kupa_id):
     return None, len(sorted_kupot)
 
 
-def calculate_potential_amount(current_amount, current_kupa, better_kupa):
-    diff = (
-        better_kupa["tsua_mitztaberet_letkufa"]
-        - current_kupa["tsua_mitztaberet_letkufa"]
-    )
+def calculate_potential_amount(
+    current_amount,
+    current_kupa,
+    better_kupa,
+    ):
+    diff = better_kupa["tsua_mitztaberet_letkufa"] - current_kupa["tsua_mitztaberet_letkufa"]
     potential = current_amount * (1 + diff / 100)
     return round(potential, 2)
 
@@ -146,12 +154,14 @@ def run_comparison(
         all_kopot_in_risk_level = get_kupot_by_risk_level(kupot_list, risk_level)
 
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
-        adjusted_kupot = apply_dmey_nihul(
-            copy.deepcopy(all_kopot_in_risk_level), dmey_nihul
-        )
+        adjusted_kupot = apply_dmey_nihul(copy.deepcopy(all_kopot_in_risk_level), dmey_nihul)
         normalize_data(adjusted_kupot)
         sorted_kupot = add_grade_and_sort(
-            adjusted_kupot, weight_1, weight_3, weight_5, weight_sharp
+            adjusted_kupot,
+            weight_1,
+            weight_3,
+            weight_5,
+            weight_sharp,
         )
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
@@ -179,7 +189,9 @@ def run_comparison(
         for better_kupa in top_3:
             if better_kupa["ID"] != client_kupa["ID"]:
                 potential_amount = calculate_potential_amount(
-                    money, client_kupa, better_kupa
+                    money,
+                    client_kupa,
+                    better_kupa,
                 )
                 output.append(
                     {

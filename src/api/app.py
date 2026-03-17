@@ -1,13 +1,13 @@
 # ----- Imports ----- #
 
-from typing import List
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 # כל הקופות נתותים כללים לשנה וחלוקה לקבוצות ראשיות לחודש ב15 לחודש?
 # בג apollo2 % python3 -m src.api.app
 import uvicorn
-from fastapi import FastAPI, Form, UploadFile, File
+
 from src.engines.engine import run_comparison
-from fastapi.middleware.cors import CORSMiddleware
 
 
 APP = FastAPI()
@@ -29,7 +29,7 @@ async def compare(
     weight_3: int = Form(),
     weight_5: int = Form(),
     weight_sharp: int = Form(),
-    mislaka_file: List[UploadFile] = File(...),
+    mislaka_file: list[UploadFile] = File(...),
     ):
     l_con = []
     for file in mislaka_file:
@@ -51,4 +51,9 @@ async def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run("src.api.app:APP", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run(
+        "src.api.app:APP",
+        host="127.0.0.1",
+        port=8000,
+        reload=True,
+    )

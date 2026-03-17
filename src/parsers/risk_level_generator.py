@@ -20,7 +20,11 @@ def get_risk_level(kupa_id):
         return "high"
 
 
-def extract_data_from_xml(field_name, row, field_type=str):
+def extract_data_from_xml(
+    field_name,
+    row,
+    field_type=str,
+    ):
     data = row.find(field_name)
     if data is not None and data.text is not None:
         return field_type(data.text)
@@ -34,7 +38,15 @@ def get_stocks_percentage_by_kupa_id(content):
     root = hey.getroot()
 
     for row in root.findall("Row"):
-        ID_KUPA = extract_data_from_xml("ID_KUPA", row, int)
+        ID_KUPA = extract_data_from_xml(
+            "ID_KUPA",
+            row,
+            int,
+        )
         SHM_SUG_NECHES = extract_data_from_xml("SHM_SUG_NECHES", row)
         if SHM_SUG_NECHES == ", חשיפה למניות":
-            RISKS_DICT[ID_KUPA] = extract_data_from_xml("ACHUZ_SUG_NECHES", row, float)
+            RISKS_DICT[ID_KUPA] = extract_data_from_xml(
+                "ACHUZ_SUG_NECHES",
+                row,
+                float,
+            )

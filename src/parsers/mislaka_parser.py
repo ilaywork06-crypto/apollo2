@@ -1,12 +1,17 @@
 # ----- Imports ----- #
 
-import lxml.etree as ET
 import re
+
+import lxml.etree as ET
 
 # ----- Functions ----- #
 
 
-def extract_data_from_xml(field_name, row, field_type=str):
+def extract_data_from_xml(
+    field_name,
+    row,
+    field_type=str,
+    ):
     data = row.find(field_name)
     if data is not None and data.text is not None:
         return field_type(data.text)
@@ -24,7 +29,11 @@ def parse_multible_mislaka_files(files):
 
 def parse_mislaka_file(content):
     if isinstance(content, str):
-        content = re.sub(r"<\?xml[^?]*\?>", "", content).strip()
+        content = re.sub(
+            r"<\?xml[^?]*\?>",
+            "",
+            content,
+        ).strip()
         content = content.encode("utf-8")
     list_of_kupot = []
     root = ET.fromstring(content)
@@ -42,16 +51,20 @@ def parse_mislaka_file(content):
                 maslulim = [polisa]
             for maslul in maslulim:
                 SCHUM_TZVIRA_BAMASLUL = extract_data_from_xml(
-                    ".//SCHUM-TZVIRA-BAMASLUL", maslul, float
+                    ".//SCHUM-TZVIRA-BAMASLUL",
+                    maslul,
+                    float,
                 )
-                KOD_MASLUL_HASHKAA = extract_data_from_xml(
-                    ".//KOD-MASLUL-HASHKAA", maslul
-                )
+                KOD_MASLUL_HASHKAA = extract_data_from_xml(".//KOD-MASLUL-HASHKAA", maslul)
                 SHEUR_DMEI_NIHUL_TZVIRA = extract_data_from_xml(
-                    ".//SHEUR-DMEI-NIHUL-HISACHON-MIVNE", maslul, float
+                    ".//SHEUR-DMEI-NIHUL-HISACHON-MIVNE",
+                    maslul,
+                    float,
                 )
                 SHEUR_DMEI_NIHUL_HAFKADA = extract_data_from_xml(
-                    ".//SHEUR-DMEI-NIHUL-HAFKADA-MIVNE", polisa, float
+                    ".//SHEUR-DMEI-NIHUL-HAFKADA-MIVNE",
+                    polisa,
+                    float,
                 )
                 kod_maslul = "fr"
                 if KOD_MASLUL_HASHKAA[-6:] != "N/A":

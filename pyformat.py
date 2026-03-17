@@ -64,7 +64,7 @@ class ParameterFormatter(cst.CSTTransformer):
             + (1 if isinstance(params.star_arg, cst.Param) else 0)
         )
 
-        if total <= 3:
+        if total < 3:
             return updated_node
 
         indent = "    "
@@ -118,7 +118,50 @@ class ParameterFormatter(cst.CSTTransformer):
                 indent=True,
                 last_line=cst.SimpleWhitespace(indent),
             ),
+        )
 
+    def leave_Call(
+        self, original_node: cst.Call, updated_node: cst.Call
+    ) -> cst.Call:
+        """Expand function call arguments to one-per-line when total count >= 3."""
+        args = updated_node.args
+        if len(args) < 3:
+            return updated_node
+
+        indent = "    "
+
+        newline_then_indent = cst.ParenthesizedWhitespace(
+            first_line=cst.TrailingWhitespace(newline=cst.Newline()),
+            indent=True,
+            last_line=cst.SimpleWhitespace(indent),
+        )
+
+        new_args = []
+        for i, arg in enumerate(args):
+            is_last = i == len(args) - 1
+            if is_last:
+                # trailing comma + newline so ) drops to its own line
+                closing_newline = cst.ParenthesizedWhitespace(
+                    first_line=cst.TrailingWhitespace(newline=cst.Newline()),
+                    indent=True,
+                    last_line=cst.SimpleWhitespace(""),
+                )
+                new_arg = arg.with_changes(
+                    comma=cst.Comma(whitespace_after=closing_newline)
+                )
+            else:
+                new_arg = arg.with_changes(
+                    comma=cst.Comma(whitespace_after=newline_then_indent)
+                )
+            new_args.append(new_arg)
+
+        return updated_node.with_changes(
+            args=new_args,
+            whitespace_before_args=cst.ParenthesizedWhitespace(
+                first_line=cst.TrailingWhitespace(newline=cst.Newline()),
+                indent=True,
+                last_line=cst.SimpleWhitespace(indent),
+            ),
         )
 
 
@@ -135,6 +178,11 @@ class BlankLineFormatter(cst.CSTTransformer):
         result = []
         import_block_ended = False
         last_was_import = False
+        has_imports = any(
+            isinstance(s, cst.SimpleStatementLine)
+            and any(isinstance(x, (cst.Import, cst.ImportFrom)) for x in s.body)
+            for s in new_body
+        )
 
         for i, stmt in enumerate(new_body):
             is_import = isinstance(stmt, cst.SimpleStatementLine) and any(
@@ -143,10 +191,16 @@ class BlankLineFormatter(cst.CSTTransformer):
             is_class_or_func = isinstance(stmt, (cst.ClassDef, cst.FunctionDef))
 
             if last_was_import and not is_import and not import_block_ended:
+                # transition out of import block — always 1 blank line
                 import_block_ended = True
                 stmt = self._set_leading_lines(stmt, 1)
-            elif is_class_or_func and i > 0 and import_block_ended:
-                stmt = self._set_leading_lines(stmt, 2)
+            elif is_class_or_func and i > 0:
+                if not has_imports:
+                    # no imports in file — still apply 2 blank lines
+                    stmt = self._set_leading_lines(stmt, 2)
+                elif import_block_ended and not last_was_import:
+                    # normal case: after imports, 2 blank lines before each class/func
+                    stmt = self._set_leading_lines(stmt, 2)
 
             result.append(stmt)
             last_was_import = is_import
@@ -344,6 +398,14 @@ def add_section_comments(source: str) -> str:
     return "".join(result)
 
 
+def strip_sections_from_file(path: Path) -> None:
+    """Strip existing section headers before ruff runs — prevents I001 false positives."""
+    original = path.read_text(encoding="utf-8")
+    cleaned = strip_existing_sections(original)
+    if cleaned != original:
+        path.write_text(cleaned, encoding="utf-8")
+
+
 def run_ruff(target: str) -> None:
     try:
         proc = subprocess.run(
@@ -359,8 +421,57 @@ def run_ruff(target: str) -> None:
         print("  ⚠  ruff not found — skipping (pip install ruff)")
 
 
+def move_comments_out_of_imports(source: str) -> str:
+    """
+    Move inline comments that appear inside the import block to after it.
+    isort breaks when comments interrupt the import block.
+    """
+    lines = source.splitlines(keepends=True)
+    in_import_block = False
+    import_end = None
+
+    # find where import block ends
+    for i, line in enumerate(lines):
+        s = line.lstrip()
+        if s.startswith("import ") or s.startswith("from "):
+            in_import_block = True
+            import_end = i
+        elif in_import_block and not s.startswith("#") and s.strip() != "":
+            break
+
+    if import_end is None:
+        return source
+
+    result = []
+    deferred_comments = []
+    in_import_block = False
+
+    for i, line in enumerate(lines):
+        s = line.lstrip()
+        is_import = s.startswith("import ") or s.startswith("from ")
+        is_comment = s.startswith("#")
+
+        if is_import:
+            in_import_block = True
+            result.append(line)
+        elif in_import_block and is_comment:
+            # defer comment until after imports
+            deferred_comments.append(line)
+        else:
+            if in_import_block and not is_import:
+                in_import_block = False
+                # flush deferred comments after import block
+                result.extend(deferred_comments)
+                deferred_comments = []
+            result.append(line)
+
+    result.extend(deferred_comments)
+    return "".join(result)
+
+
 def format_source(source: str, use_sections: bool = False) -> str:
     source = strip_existing_sections(source)
+    source = move_comments_out_of_imports(source)
 
     try:
         tree = parse_module(source)
@@ -412,10 +523,16 @@ def format_target(target: str, use_sections: bool, dry_run: bool):
         print("No Python files found.")
         return
 
-    # ruff first — cleans the base
+    # Step 1: strip existing section headers so ruff doesn't get confused
+    if not dry_run:
+        for f in files:
+            strip_sections_from_file(f)
+
+    # Step 2: ruff format
     if not dry_run:
         run_ruff(target)
 
+    # Step 3: our conventions
     changed = 0
     for f in files:
         if format_file(f, use_sections, dry_run):
