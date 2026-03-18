@@ -2,22 +2,18 @@
 pyformat.py — Custom Python formatter using libcst.
 
 Conventions applied:
-  1. ruff format runs first
-  2. Function parameters: one per line if more than 3 params (including *args, **kwargs, kwonly)
-  3. 2 blank lines before class/function definitions (top-level)
-  4. 1 blank line after the import block
-  5. Optional section comments (--sections flag)
-     Format:  # ----- Imports ----- #
-     Order:   Imports → Classes → Functions
-     Handles decorators correctly
-     Idempotent: strips old headers before re-injecting
+  1. ruff format + ruff check --fix runs first
+  2. Reorders module to: Imports → Constants → Classes → Functions → Other
+  3. Function/call parameters: one per line if count >= 3
+  4. 2 blank lines before class/function (top-level)
+  5. 1 blank line after import block
+  6. Section headers: # ----- Imports ----- # etc.
 
 Usage:
-  python pyformat.py .                         # format recursively
-  python pyformat.py src/                      # specific directory
-  python pyformat.py file.py                   # single file
-  python pyformat.py . --sections              # with section dividers
-  python pyformat.py . --dry-run               # preview only
+  python pyformat.py .          # format recursively
+  python pyformat.py src/       # specific directory
+  python pyformat.py file.py    # single file
+  python pyformat.py . --dry-run
 """
 
 import argparse
@@ -38,81 +34,51 @@ except ImportError:
 
 
 class ParameterFormatter(cst.CSTTransformer):
-    """
-    Expand ALL function parameters to one-per-line when total count > 3.
-    Handles: regular params, *args, keyword-only, **kwargs, defaults, annotations.
-
-    Before:  def foo(a, b, c, d, **kwargs):
-    After:   def foo(
-                 a,
-                 b,
-                 c,
-                 d,
-                 **kwargs,
-             ):
-    """
+    """Expand params/args to one-per-line when count >= 3."""
 
     def leave_FunctionDef(
         self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
     ) -> cst.FunctionDef:
         params = updated_node.params
-
         total = (
             len(params.params)
             + len(params.kwonly_params)
             + (1 if params.star_kwarg else 0)
             + (1 if isinstance(params.star_arg, cst.Param) else 0)
         )
-
         if total < 3:
             return updated_node
 
         indent = "    "
-
-        newline_then_indent = cst.ParenthesizedWhitespace(
+        newline_indent = cst.ParenthesizedWhitespace(
             first_line=cst.TrailingWhitespace(newline=cst.Newline()),
             indent=True,
             last_line=cst.SimpleWhitespace(indent),
         )
 
-        def with_trailing_comma(param):
-            return param.with_changes(
-                comma=cst.Comma(whitespace_after=newline_then_indent)
-            )
+        def with_comma(param):
+            return param.with_changes(comma=cst.Comma(whitespace_after=newline_indent))
 
-        def without_comma(param):
-            return param.with_changes(comma=cst.MaybeSentinel.DEFAULT)
-
-        # Regular params
-        new_params = [with_trailing_comma(p) for p in params.params]
-
-        # *args
+        new_params = [with_comma(p) for p in params.params]
         new_star_arg = params.star_arg
         if isinstance(params.star_arg, cst.Param):
-            new_star_arg = with_trailing_comma(params.star_arg)
-
-        # keyword-only params
-        new_kwonly = [with_trailing_comma(p) for p in params.kwonly_params]
-
-        # Add trailing comma to last param so closing ) drops to its own line
+            new_star_arg = with_comma(params.star_arg)
+        new_kwonly = [with_comma(p) for p in params.kwonly_params]
         new_star_kwarg = params.star_kwarg
         if params.star_kwarg:
-            new_star_kwarg = with_trailing_comma(params.star_kwarg)
+            new_star_kwarg = with_comma(params.star_kwarg)
         elif new_kwonly:
-            new_kwonly[-1] = with_trailing_comma(new_kwonly[-1])
+            new_kwonly[-1] = with_comma(new_kwonly[-1])
         elif new_params:
-            new_params[-1] = with_trailing_comma(new_params[-1])
-
-        new_parameters = params.with_changes(
-            params=new_params,
-            star_arg=new_star_arg,
-            kwonly_params=new_kwonly,
-            star_kwarg=new_star_kwarg,
-        )
+            new_params[-1] = with_comma(new_params[-1])
 
         return updated_node.with_changes(
-            params=new_parameters,
-            # Force first param onto next line after (
+            params=params.with_changes(
+                params=new_params,
+                star_arg=new_star_arg,
+                kwonly_params=new_kwonly,
+                star_kwarg=new_star_kwarg,
+            ),
             whitespace_before_params=cst.ParenthesizedWhitespace(
                 first_line=cst.TrailingWhitespace(newline=cst.Newline()),
                 indent=True,
@@ -123,22 +89,24 @@ class ParameterFormatter(cst.CSTTransformer):
     def leave_Call(
         self, original_node: cst.Call, updated_node: cst.Call
     ) -> cst.Call:
-        """Expand function call arguments to one-per-line when total count >= 3."""
         args = updated_node.args
         if len(args) < 3:
             return updated_node
 
-        # Skip calls that are already multi-line (args already have newlines)
+        # skip already multi-line calls
         for arg in args:
-            comma = arg.comma
-            if isinstance(comma, cst.Comma):
-                ws = comma.whitespace_after
-                if isinstance(ws, cst.ParenthesizedWhitespace):
-                    return updated_node
+            if isinstance(arg.comma, cst.Comma) and isinstance(
+                arg.comma.whitespace_after, cst.ParenthesizedWhitespace
+            ):
+                return updated_node
 
         indent = "    "
-
-        newline_then_indent = cst.ParenthesizedWhitespace(
+        newline_indent = cst.ParenthesizedWhitespace(
+            first_line=cst.TrailingWhitespace(newline=cst.Newline()),
+            indent=True,
+            last_line=cst.SimpleWhitespace(indent),
+        )
+        closing_newline = cst.ParenthesizedWhitespace(
             first_line=cst.TrailingWhitespace(newline=cst.Newline()),
             indent=True,
             last_line=cst.SimpleWhitespace(indent),
@@ -147,21 +115,13 @@ class ParameterFormatter(cst.CSTTransformer):
         new_args = []
         for i, arg in enumerate(args):
             is_last = i == len(args) - 1
-            if is_last:
-                # trailing comma + newline so ) drops to its own line
-                closing_newline = cst.ParenthesizedWhitespace(
-                    first_line=cst.TrailingWhitespace(newline=cst.Newline()),
-                    indent=False,
-                    last_line=cst.SimpleWhitespace(""),
+            new_args.append(
+                arg.with_changes(
+                    comma=cst.Comma(
+                        whitespace_after=closing_newline if is_last else newline_indent
+                    )
                 )
-                new_arg = arg.with_changes(
-                    comma=cst.Comma(whitespace_after=closing_newline)
-                )
-            else:
-                new_arg = arg.with_changes(
-                    comma=cst.Comma(whitespace_after=newline_then_indent)
-                )
-            new_args.append(new_arg)
+            )
 
         return updated_node.with_changes(
             args=new_args,
@@ -174,10 +134,7 @@ class ParameterFormatter(cst.CSTTransformer):
 
 
 class BlankLineFormatter(cst.CSTTransformer):
-    """
-    - 1 blank line after the import block
-    - 2 blank lines before top-level class/function (not right after imports)
-    """
+    """1 blank line after imports, 2 blank lines before top-level class/func."""
 
     def leave_Module(
         self, original_node: cst.Module, updated_node: cst.Module
@@ -199,15 +156,10 @@ class BlankLineFormatter(cst.CSTTransformer):
             is_class_or_func = isinstance(stmt, (cst.ClassDef, cst.FunctionDef))
 
             if last_was_import and not is_import and not import_block_ended:
-                # transition out of import block — always 1 blank line
                 import_block_ended = True
                 stmt = self._set_leading_lines(stmt, 1)
             elif is_class_or_func and i > 0:
-                if not has_imports:
-                    # no imports in file — still apply 2 blank lines
-                    stmt = self._set_leading_lines(stmt, 2)
-                elif import_block_ended and not last_was_import:
-                    # normal case: after imports, 2 blank lines before each class/func
+                if not has_imports or (import_block_ended and not last_was_import):
                     stmt = self._set_leading_lines(stmt, 2)
 
             result.append(stmt)
@@ -216,9 +168,10 @@ class BlankLineFormatter(cst.CSTTransformer):
         return updated_node.with_changes(body=result)
 
     def _set_leading_lines(self, stmt, count: int):
-        empty_lines = [cst.EmptyLine() for _ in range(count)]
         try:
-            return stmt.with_changes(leading_lines=empty_lines)
+            return stmt.with_changes(
+                leading_lines=[cst.EmptyLine() for _ in range(count)]
+            )
         except Exception:
             return stmt
 
@@ -228,6 +181,21 @@ class BlankLineFormatter(cst.CSTTransformer):
 _SECTION_RE = re.compile(
     r"^[ \t]*#[ \t]*(?:-----[^\n]*-----|[─\-]{3,}[^\n]*[─\-]{3,})[ \t]*(?:#[ \t]*)?\n",
     re.MULTILINE,
+)
+_CONST_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*\s*(?::[^=]+)?\s*=\s*(.+)")
+_PRIMITIVE_RE = re.compile(
+    r"""^(?:
+    -?\d[\d_]*(?:\.\d+)?
+    |"[^"]*"
+    |'[^']*'
+    |True|False|None
+    |\(.*\)
+    |\[.*\]
+    |\{[^(]*\}
+    |r"[^"]*"|r'[^']*'
+    |f"[^"]*"|f'[^']*'
+)\s*$""",
+    re.VERBOSE,
 )
 
 
@@ -239,8 +207,121 @@ def strip_existing_sections(source: str) -> str:
     return _SECTION_RE.sub("", source)
 
 
+def _is_const_line(line: str) -> bool:
+    """
+    A constant is any top-level ALL_CAPS assignment — regardless of value.
+    ALL_CAPS = os.getenv(...) is still a constant by convention.
+    Rejects indented lines (inside functions/classes).
+    """
+    line = line.rstrip()
+    if not line or line != line.lstrip():
+        return False
+    # ALL_CAPS: type = ... (annotated)
+    if re.match(r"^[A-Z][A-Z0-9_]*[ 	]*:[^=]+=", line):
+        return True
+    # ALL_CAPS = anything
+    if re.match(r"^[A-Z][A-Z0-9_]*[ 	]*=", line):
+        return True
+    return False
+
+
+
+def reorder_module(source: str) -> str:
+    """
+    Physically reorder top-level statements into:
+      Imports → Constants → Classes → Functions → Other
+
+    Uses libcst to parse, then rebuilds module.body in the correct order.
+    Docstring (if present) always stays first.
+    """
+    try:
+        tree = parse_module(source)
+    except cst.ParserSyntaxError:
+        return source
+
+    body = list(tree.body)
+
+    imports = []
+    constants = []
+    classes = []
+    functions = []
+    other = []
+    docstring = None
+
+    # Check for module docstring (first statement is a string expression)
+    start = 0
+    if body and isinstance(body[0], cst.SimpleStatementLine):
+        stmts = body[0].body
+        if len(stmts) == 1 and isinstance(stmts[0], cst.Expr):
+            val = stmts[0].value
+            if isinstance(val, (cst.SimpleString, cst.ConcatenatedString, cst.FormattedString)):
+                docstring = body[0]
+                start = 1
+
+    for stmt in body[start:]:
+        # Imports
+        if isinstance(stmt, cst.SimpleStatementLine) and any(
+            isinstance(s, (cst.Import, cst.ImportFrom)) for s in stmt.body
+        ):
+            imports.append(stmt)
+
+        # Constants — regular assignments AND annotated assignments (e.g. STORE: dict = {})
+        elif isinstance(stmt, cst.SimpleStatementLine) and any(
+            isinstance(s, (cst.Assign, cst.AnnAssign)) for s in stmt.body
+        ):
+            line_src = tree.code_for_node(stmt)
+            if _is_const_line(line_src):
+                constants.append(stmt)
+            else:
+                other.append(stmt)
+
+        # Classes
+        elif isinstance(stmt, cst.ClassDef):
+            classes.append(stmt)
+
+        # Functions
+        elif isinstance(stmt, cst.FunctionDef):
+            functions.append(stmt)
+
+        # Everything else (if __name__, APP.add_middleware, etc.)
+        else:
+            other.append(stmt)
+
+    def clean_leading(stmt):
+        """Remove leading blank lines — BlankLineFormatter will re-add them."""
+        try:
+            return stmt.with_changes(leading_lines=[])
+        except Exception:
+            return stmt
+
+    new_body = []
+
+    if docstring:
+        new_body.append(docstring)
+
+    for stmt in imports:
+        new_body.append(clean_leading(stmt))
+
+    for stmt in constants:
+        new_body.append(clean_leading(stmt))
+
+    # "other" = top-level code that's not import/const/class/func
+    # e.g. app = FastAPI(), app.add_middleware(...), logger = ...
+    # placed AFTER constants, BEFORE classes and functions
+    for stmt in other:
+        new_body.append(clean_leading(stmt))
+
+    for stmt in classes:
+        new_body.append(clean_leading(stmt))
+
+    for stmt in functions:
+        new_body.append(clean_leading(stmt))
+
+    new_tree = tree.with_changes(body=new_body)
+    return new_tree.code
+
+
 def _inject_header(result: list, header: str, line: str) -> None:
-    """Strip trailing blanks, write: blank + header + 2 blanks + line."""
     while result and result[-1].strip() == "":
         result.pop()
     result.append("\n")
@@ -250,39 +331,8 @@ def _inject_header(result: list, header: str, line: str) -> None:
     result.append(line)
 
 
-# Constants = top-level (no indentation) ALL_CAPS assignments with primitive values.
-# Excludes: indented lines (inside functions/classes), class instances, function calls.
-_CONST_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*\s*(?::[^=]+)?\s*=\s*(.+)")
-_PRIMITIVE_RE = re.compile(r"""^(?:
-    -?\d[\d_]*(?:\.\d+)?        # int / float
-    |"[^"]*"                    # double-quoted string
-    |'[^']*'                 # single-quoted string
-    |True|False|None            # builtins
-    |\(.*\)                     # tuple
-    |\[.*\]                     # list
-    |r"[^"]*"|r'[^']*'       # raw strings
-    |f"[^"]*"|f'[^']*'       # f-strings
-)\s*$""", re.VERBOSE)
-
-
-def _is_const_line(line: str) -> bool:
-    # Must be at column 0 (top-level only — not inside a function or class)
-    if line != line.lstrip():
-        return False
-    m = _CONST_NAME_RE.match(line)
-    if not m:
-        return False
-    value = m.group(1).strip()
-    return bool(_PRIMITIVE_RE.match(value))
-
-
 def _find_section_indices(source: str) -> dict:
-    """
-    Use libcst to find the line numbers of the first import, last import,
-    first const, first class, first function — all at module (top) level only.
-    Returns a dict with keys: first_import, last_import, first_const, first_class, first_func.
-    All values are line numbers (1-based from libcst) converted to 0-based for splitlines().
-    """
+    """Use libcst to find accurate top-level line indices."""
     try:
         tree = parse_module(source)
     except cst.ParserSyntaxError:
@@ -290,6 +340,7 @@ def _find_section_indices(source: str) -> dict:
 
     wrapper = cst.metadata.MetadataWrapper(tree)
     positions = wrapper.resolve(cst.metadata.PositionProvider)
+    lines = source.splitlines(keepends=True)
 
     result = {
         "first_import": None,
@@ -297,15 +348,13 @@ def _find_section_indices(source: str) -> dict:
         "first_const": None,
         "first_class": None,
         "first_func": None,
+        "first_other": None,
     }
-
-    lines = source.splitlines(keepends=True)
 
     for stmt in wrapper.module.body:
         pos = positions[stmt]
         start_line = pos.start.line - 1
 
-        # Imports
         if isinstance(stmt, cst.SimpleStatementLine) and any(
             isinstance(s, (cst.Import, cst.ImportFrom)) for s in stmt.body
         ):
@@ -313,72 +362,74 @@ def _find_section_indices(source: str) -> dict:
                 result["first_import"] = start_line
             result["last_import"] = start_line
 
-        # Constants: top-level ALL_CAPS with primitive value
         if isinstance(stmt, cst.SimpleStatementLine) and any(
             isinstance(s, cst.Assign) for s in stmt.body
         ):
-            if _is_const_line(lines[start_line]):
-                if result["first_const"] is None:
-                    result["first_const"] = start_line
+            if _is_const_line(lines[start_line]) and result["first_const"] is None:
+                result["first_const"] = start_line
 
-        # Classes — point at decorator if present
-        if isinstance(stmt, cst.ClassDef):
-            if result["first_class"] is None:
-                if stmt.decorators:
-                    result["first_class"] = positions[stmt.decorators[0]].start.line - 1
-                else:
-                    result["first_class"] = start_line
+        if isinstance(stmt, cst.ClassDef) and result["first_class"] is None:
+            result["first_class"] = (
+                positions[stmt.decorators[0]].start.line - 1
+                if stmt.decorators
+                else start_line
+            )
 
-        # Functions — point at decorator if present
-        if isinstance(stmt, cst.FunctionDef):
-            if result["first_func"] is None:
-                if stmt.decorators:
-                    result["first_func"] = positions[stmt.decorators[0]].start.line - 1
-                else:
-                    result["first_func"] = start_line
+        if isinstance(stmt, cst.FunctionDef) and result["first_func"] is None:
+            result["first_func"] = (
+                positions[stmt.decorators[0]].start.line - 1
+                if stmt.decorators
+                else start_line
+            )
+
+        # Other: not import, not const, not class, not func
+        is_import = isinstance(stmt, cst.SimpleStatementLine) and any(
+            isinstance(s, (cst.Import, cst.ImportFrom)) for s in stmt.body
+        )
+        is_const = isinstance(stmt, cst.SimpleStatementLine) and any(
+            isinstance(s, cst.Assign) for s in stmt.body
+        ) and _is_const_line(lines[start_line])
+        is_class = isinstance(stmt, cst.ClassDef)
+        is_func = isinstance(stmt, cst.FunctionDef)
+
+        if not any([is_import, is_const, is_class, is_func]):
+            if result["first_other"] is None:
+                result["first_other"] = start_line
 
     return result
 
 
 def add_section_comments(source: str) -> str:
-    """
-    Inject section dividers — idempotent, decorator-aware.
-    Order: Imports → Constants → Classes → Functions
-
-    Uses libcst for accurate top-level detection (no false positives from
-    indented code, decorators with multi-line bodies, etc.)
-    """
+    """Inject section dividers. Idempotent."""
     source = strip_existing_sections(source)
     indices = _find_section_indices(source)
 
     first_import_idx = indices.get("first_import")
-    last_import_idx  = indices.get("last_import")
-    first_const_idx  = indices.get("first_const")
-    first_class_idx  = indices.get("first_class")
-    first_func_idx   = indices.get("first_func")
+    last_import_idx = indices.get("last_import")
+    first_const_idx = indices.get("first_const")
+    first_class_idx = indices.get("first_class")
+    first_func_idx = indices.get("first_func")
+    first_other_idx = indices.get("first_other")
 
     lines = source.splitlines(keepends=True)
-
     result = []
     consts_header_added = False
     classes_header_added = False
     functions_header_added = False
+    other_header_added = False
 
     for idx, line in enumerate(lines):
-        # Imports header
         if idx == first_import_idx:
             while result and result[-1].strip() == "":
                 result.pop()
             result.append(_section("Imports") + "\n")
             result.append("\n")
 
-        # 1 blank line after last import
         if last_import_idx is not None and idx == last_import_idx + 1:
             while result and result[-1].strip() == "":
                 result.pop()
             result.append("\n")
 
-        # Constants header — 1 blank line before (not 2)
         if idx == first_const_idx and not consts_header_added:
             while result and result[-1].strip() == "":
                 result.pop()
@@ -389,16 +440,19 @@ def add_section_comments(source: str) -> str:
             consts_header_added = True
             continue
 
-        # Classes header
         if idx == first_class_idx and not classes_header_added:
             _inject_header(result, _section("Classes"), line)
             classes_header_added = True
             continue
 
-        # Functions header
         if idx == first_func_idx and not functions_header_added:
             _inject_header(result, _section("Functions"), line)
             functions_header_added = True
+            continue
+
+        if idx == first_other_idx and not other_header_added:
+            _inject_header(result, _section("Other"), line)
+            other_header_added = True
             continue
 
         result.append(line)
@@ -407,7 +461,6 @@ def add_section_comments(source: str) -> str:
 
 
 def strip_sections_from_file(path: Path) -> None:
-    """Strip existing section headers before ruff runs — prevents I001 false positives."""
     original = path.read_text(encoding="utf-8")
     cleaned = strip_existing_sections(original)
     if cleaned != original:
@@ -416,90 +469,53 @@ def strip_sections_from_file(path: Path) -> None:
 
 def run_ruff(target: str) -> None:
     try:
-        proc = subprocess.run(
-            ["ruff", "format", target],
-            capture_output=True,
-            text=True,
-        )
+        subprocess.run(["ruff", "check", "--fix", target], capture_output=True)
+        proc = subprocess.run(["ruff", "format", target], capture_output=True, text=True)
         if proc.returncode != 0:
-            print(f"  ⚠  ruff format failed:\n{proc.stderr}")
+            print(f"  ⚠  ruff failed:\n{proc.stderr}")
         else:
-            print("  ✓ ruff format done")
+            print("  ✓ ruff done")
     except FileNotFoundError:
-        print("  ⚠  ruff not found — skipping (pip install ruff)")
+        print("  ⚠  ruff not found (pip install ruff)")
 
 
-def move_comments_out_of_imports(source: str) -> str:
-    """
-    Move inline comments that appear inside the import block to after it.
-    isort breaks when comments interrupt the import block.
-    """
-    lines = source.splitlines(keepends=True)
-    in_import_block = False
-    import_end = None
-
-    # find where import block ends
-    for i, line in enumerate(lines):
-        s = line.lstrip()
-        if s.startswith("import ") or s.startswith("from "):
-            in_import_block = True
-            import_end = i
-        elif in_import_block and not s.startswith("#") and s.strip() != "":
-            break
-
-    if import_end is None:
-        return source
-
-    result = []
-    deferred_comments = []
-    in_import_block = False
-
-    for i, line in enumerate(lines):
-        s = line.lstrip()
-        is_import = s.startswith("import ") or s.startswith("from ")
-        is_comment = s.startswith("#")
-
-        if is_import:
-            in_import_block = True
-            result.append(line)
-        elif in_import_block and is_comment:
-            # defer comment until after imports
-            deferred_comments.append(line)
-        else:
-            if in_import_block and not is_import:
-                in_import_block = False
-                # flush deferred comments after import block
-                result.extend(deferred_comments)
-                deferred_comments = []
-            result.append(line)
-
-    result.extend(deferred_comments)
-    return "".join(result)
-
-
-def format_source(source: str, use_sections: bool = False) -> str:
+def format_source(source: str) -> str:
     source = strip_existing_sections(source)
-    source = move_comments_out_of_imports(source)
+
+    # Step 1: reorder top-level statements (imports→consts→classes→funcs→other)
+    source = reorder_module(source)
 
     try:
         tree = parse_module(source)
     except cst.ParserSyntaxError as e:
         raise ValueError(f"Syntax error: {e}") from e
 
+    # Step 2: blank lines
     tree = tree.visit(BlankLineFormatter())
+
+    # Step 3: expand params/args
     tree = tree.visit(ParameterFormatter())
+
     result = tree.code
 
-    if use_sections:
-        result = add_section_comments(result)
+    # Step 4: section headers
+    result = add_section_comments(result)
+
+    if not result.endswith("\n"):
+        result += "\n"
 
     return result
 
 
-def format_file(path: Path, use_sections: bool, dry_run: bool) -> bool:
+def format_source_path(path: Path) -> str:
+    """Read file, reorder, then return formatted source."""
+    return format_source(path.read_text(encoding="utf-8"))
+
+
+def format_file(path: Path, dry_run: bool) -> bool:
     original = path.read_text(encoding="utf-8")
     try:
-        formatted = format_source(original, use_sections)
+        formatted = format_source(original)
     except ValueError as e:
         print(f"  ⚠  Skipping {path}: {e}")
         return False
@@ -516,7 +532,7 @@ def format_file(path: Path, use_sections: bool, dry_run: bool) -> bool:
     return True
 
 
-def format_target(target: str, use_sections: bool, dry_run: bool):
+def format_target(target: str, dry_run: bool):
     p = Path(target)
 
     if p.is_file():
@@ -531,19 +547,17 @@ def format_target(target: str, use_sections: bool, dry_run: bool):
         print("No Python files found.")
         return
 
-    # Step 1: strip existing section headers so ruff doesn't get confused
     if not dry_run:
+        # Step 1: strip old headers so ruff doesn't choke
         for f in files:
             strip_sections_from_file(f)
-
-    # Step 2: ruff format
-    if not dry_run:
+        # Step 2: ruff cleans syntax, sorts imports within each existing block
         run_ruff(target)
 
-    # Step 3: our conventions
+    # Step 3: our formatter — reorder + blank lines + params + sections
     changed = 0
     for f in files:
-        if format_file(f, use_sections, dry_run):
+        if format_file(f, dry_run):
             changed += 1
 
     label = "Would change" if dry_run else "Changed"
@@ -561,17 +575,12 @@ def main():
         help="File or directory to format (default: current directory)",
     )
     parser.add_argument(
-        "--sections",
-        action="store_true",
-        help="Inject section dividers: # ----- Imports ----- # etc.",
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would change without writing files",
+        help="Preview changes without writing files",
     )
     args = parser.parse_args()
-    format_target(args.target, True, args.dry_run)
+    format_target(args.target, args.dry_run)
 
 
 if __name__ == "__main__":

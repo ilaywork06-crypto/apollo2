@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import './App.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -244,7 +244,46 @@ function WeightsForm({ weights, onChange }) {
 
 // ─── Multi Upload Zone ────────────────────────────────────────────────────────
 
-function MultiUploadZone({ files, onFiles, onRemoveFile }) {
+// ─── XML Tree Viewer ──────────────────────────────────────────────────────────
+
+function TreeNode({ node, depth = 0 }) {
+  const [expanded, setExpanded] = useState(depth < 2);
+
+  const childElements = Array.from(node.children || []);
+  const hasChildren = childElements.length > 0;
+  const textValue = (!hasChildren && node.textContent) ? node.textContent.trim() : null;
+  const childCount = hasChildren ? childElements.length : 0;
+
+  return (
+    <div>
+      <div
+        className="tree-row"
+        style={{ paddingRight: `${depth * 20 + 12}px` }}
+        onClick={() => hasChildren && setExpanded(!expanded)}
+      >
+        {hasChildren ? (
+          <span className="tree-arrow">{expanded ? '▼' : '▶'}</span>
+        ) : (
+          <span className="tree-dot">●</span>
+        )}
+        <span className="tree-tag">{node.tagName}</span>
+        {hasChildren && <span className="tree-count">({childCount})</span>}
+        {textValue && <span className="tree-value">{textValue}</span>}
+      </div>
+      {expanded && hasChildren && (
+        <div>
+          {childElements.map((child, i) => (
+            <TreeNode key={i} node={child} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Upload Zone ───────────────────────────────────────────────────────────────
+
+function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
   const inputRef = useRef();
 
   const handleChange = (e) => {
@@ -293,12 +332,22 @@ function MultiUploadZone({ files, onFiles, onRemoveFile }) {
           {files.map((f, i) => (
             <div key={i} className="file-list-item">
               <span className="file-list-name">📄 {f.name}</span>
-              <button
-                className="file-list-remove"
-                onClick={(e) => { e.stopPropagation(); onRemoveFile(i); }}
-              >
-                ✕
-              </button>
+              <div className="file-list-actions">
+                {/\.(xml|dat)$/i.test(f.name) && (
+                  <button
+                    className="view-file-btn"
+                    onClick={(e) => { e.stopPropagation(); onViewFile(f); }}
+                  >
+                    👁 הצג קובץ
+                  </button>
+                )}
+                <button
+                  className="file-list-remove"
+                  onClick={(e) => { e.stopPropagation(); onRemoveFile(i); }}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -309,7 +358,7 @@ function MultiUploadZone({ files, onFiles, onRemoveFile }) {
 
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, weights, onWeightsChange, onAnalyze }) {
+function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, onAnalyze }) {
   const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
   const ready = mislakaFiles.length > 0 && sum === 100;
 
@@ -330,6 +379,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, weigh
             files={mislakaFiles}
             onFiles={onMislakaFiles}
             onRemoveFile={onRemoveMislakaFile}
+            onViewFile={onViewFile}
           />
         </div>
 
@@ -1047,10 +1097,19 @@ function App() {
   const [results, setResults] = useState(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [viewingFile, setViewingFile] = useState(null);
 
   const handleRemoveMislakaFile = (idx) => {
     setMislakaFiles(prev => prev.filter((_, i) => i !== idx));
   };
+
+  const handleViewFile = useCallback(async (file) => {
+    const text = await file.text();
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(text, 'text/xml');
+    setViewingFile(xmlDoc);
+    setScreen('viewer');
+  }, []);
 
   const handleAnalyze = async () => {
     setScreen('loading');
@@ -1105,11 +1164,26 @@ function App() {
   if (screen === 'results') {
     return <ResultsScreen results={results} weights={weights} onReset={() => setScreen('upload')} />;
   }
+  if (screen === 'viewer' && viewingFile) {
+    return (
+      <div className="screen screen--viewer">
+        <Stars />
+        <div className="viewer-header">
+          <button className="back-btn" onClick={() => setScreen('upload')}>→ חזרה</button>
+          <h2>תצוגת קובץ XML</h2>
+        </div>
+        <div className="viewer-card">
+          <TreeNode node={viewingFile.documentElement} depth={0} />
+        </div>
+      </div>
+    );
+  }
   return (
     <UploadScreen
       mislakaFiles={mislakaFiles}
       onMislakaFiles={setMislakaFiles}
       onRemoveMislakaFile={handleRemoveMislakaFile}
+      onViewFile={handleViewFile}
       weights={weights}
       onWeightsChange={setWeights}
       onAnalyze={handleAnalyze}

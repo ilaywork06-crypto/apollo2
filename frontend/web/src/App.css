@@ -1260,3 +1260,135 @@ body::before {
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ─── View File Button ────────────────────────────────────────────────────── */
+.file-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-file-btn {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #94A3B8;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.view-file-btn:hover {
+  border-color: #3B82F6;
+  color: #3B82F6;
+}
+
+/* ─── XML Viewer Screen ───────────────────────────────────────────────────── */
+.screen--viewer {
+  min-height: 100vh;
+  padding: 32px 24px;
+  box-sizing: border-box;
+  direction: rtl;
+}
+
+.viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.viewer-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #F1F5F9);
+  margin: 0;
+}
+
+.back-btn {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #94A3B8;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.back-btn:hover {
+  border-color: #3B82F6;
+  color: #3B82F6;
+}
+
+.viewer-card {
+  background: #0F172A;
+  border: 1px solid #1E293B;
+  border-radius: 18px;
+  padding: 20px;
+  max-height: 75vh;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Tree Nodes ──────────────────────────────────────────────────────────── */
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  direction: rtl;
+}
+
+.tree-row:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.tree-arrow {
+  color: #64748B;
+  font-size: 10px;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.tree-dot {
+  color: #334155;
+  font-size: 6px;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.tree-tag {
+  color: #94A3B8;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+.tree-count {
+  color: #64748B;
+  font-size: 11px;
+}
+
+.tree-value {
+  color: #10B981;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 1px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+  font-family: monospace;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
