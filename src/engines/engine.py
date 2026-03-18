@@ -176,6 +176,8 @@ def run_comparison(
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
         client_kupa = next(k for k in sorted_kupot if k["ID"] == kupa["ID"])
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
+        if money == 0:
+            continue
         kupa_rank = 1
         client = {
             "name": client_kupa["shem_kupa"],
@@ -211,7 +213,6 @@ def run_comparison(
                     client_kupa,
                     better_gold,
             )
-            print("asdf")
             golden = {
                 "name": better_gold["shem_kupa"],
                 "id": better_gold["ID"],
