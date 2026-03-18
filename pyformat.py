@@ -128,6 +128,14 @@ class ParameterFormatter(cst.CSTTransformer):
         if len(args) < 3:
             return updated_node
 
+        # Skip calls that are already multi-line (args already have newlines)
+        for arg in args:
+            comma = arg.comma
+            if isinstance(comma, cst.Comma):
+                ws = comma.whitespace_after
+                if isinstance(ws, cst.ParenthesizedWhitespace):
+                    return updated_node
+
         indent = "    "
 
         newline_then_indent = cst.ParenthesizedWhitespace(
@@ -143,7 +151,7 @@ class ParameterFormatter(cst.CSTTransformer):
                 # trailing comma + newline so ) drops to its own line
                 closing_newline = cst.ParenthesizedWhitespace(
                     first_line=cst.TrailingWhitespace(newline=cst.Newline()),
-                    indent=True,
+                    indent=False,
                     last_line=cst.SimpleWhitespace(""),
                 )
                 new_arg = arg.with_changes(
@@ -563,7 +571,7 @@ def main():
         help="Show what would change without writing files",
     )
     args = parser.parse_args()
-    format_target(args.target, args.sections, args.dry_run)
+    format_target(args.target, True, args.dry_run)
 
 
 if __name__ == "__main__":
