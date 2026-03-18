@@ -160,9 +160,9 @@ def run_comparison(
         sug = kupa["SUG"]
         our_koput = filter_koput_by_sug(kupot_list, sug)
         risk_level = kupa["risk_level"]
-        all_kopot_in_risk_level = get_kupot_by_risk_level(our_koput, risk_level)
-
+        golden = {}
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
+        all_kopot_in_risk_level = get_kupot_by_risk_level(our_koput, risk_level)
         adjusted_kupot = apply_dmey_nihul(copy.deepcopy(all_kopot_in_risk_level), dmey_nihul)
         normalize_data(adjusted_kupot)
         sorted_kupot = add_grade_and_sort(
@@ -174,7 +174,6 @@ def run_comparison(
         )
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
-
         client_kupa = next(k for k in sorted_kupot if k["ID"] == kupa["ID"])
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
         kupa_rank = 1
@@ -194,6 +193,38 @@ def run_comparison(
             "seniority_date": mislaka["TAARICH-HITZTARFUT-MUTZAR"],
             "percentile": round((total_kupot - client_ranking) / total_kupot * 100),
         }
+        if risk_level != "high":
+            all_koput_in_high_risk_level = get_kupot_by_risk_level(our_koput, "high")
+            golden_adjusted_koput = apply_dmey_nihul(copy.deepcopy(all_koput_in_high_risk_level), dmey_nihul)
+            normalize_data(golden_adjusted_koput)
+            golden_sorted_kupot = add_grade_and_sort(
+            golden_adjusted_koput,
+            weight_1,
+            weight_3,
+            weight_5,
+            weight_sharp,
+        )
+            gold_3 = get_top_3(golden_sorted_kupot)
+            better_gold = gold_3[1]
+            potential_amount_gold = calculate_potential_amount(
+                    money,
+                    client_kupa,
+                    better_gold,
+            )
+            print("asdf")
+            golden = {
+                "name": better_gold["shem_kupa"],
+                "id": better_gold["ID"],
+                "grade": better_gold["grade"],
+                "rank": 1,
+                "hevra": better_gold["hevra"],
+                "tsua_1": round(better_gold["tsua_mitztaberet_letkufa"], 2),
+                "tsua_3": round(better_gold["tsua_3"], 2),
+                "tsua_5": round(better_gold["tsua_5"], 2),
+                "potential_amount": potential_amount_gold,
+                "diff": round(potential_amount_gold - money, 2),
+                "diff_percent": round((potential_amount_gold - money) / money * 100, 1),
+            }
         alternatives = []
         for better_kupa in top_3:
             if better_kupa["ID"] != client_kupa["ID"]:
@@ -227,6 +258,6 @@ def run_comparison(
                 kupa_rank += 1
             else:
                 kupa_rank += 1
-        funds_list.append({"client": client, "alternatives": alternatives})
+        funds_list.append({"client": client, "alternatives": alternatives, "golden":golden})
 
     return {"funds": funds_list}

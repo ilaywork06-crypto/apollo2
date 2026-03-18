@@ -444,7 +444,7 @@ function LoadingScreen({ step, progress }) {
 // ─── Fund Results Section ─────────────────────────────────────────────────────
 
 function FundResults({ data, weights }) {
-  const { client, alternatives } = data;
+  const { client, alternatives, golden: gold } = data;
   const isNew = client.grade === 0;
 
   const pct = client.percentile ?? 0;
@@ -707,38 +707,67 @@ function FundResults({ data, weights }) {
         </div>
       </div>
 
-      {/* 6 ─ High-risk option box */}
-      {bestAlt && diffPct > 0 && (
-        <div className="highrisk-card">
-          <div className="highrisk-icon">⚡</div>
-          <div className="highrisk-body">
-            <div className="highrisk-title">מה החמצת?</div>
-            <div className="highrisk-desc">
-              עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-
-              <strong className="highrisk-pct"> {fmtDec(diffPct)}%</strong>
-            </div>
-            <div className="highrisk-amounts">
-              <div className="highrisk-amount-item">
-                <div className="highrisk-amount-label">היום</div>
-                <div className="highrisk-amount-val">₪{fmt(client.amount)}</div>
-                {client.tsua_1 ? (
-                  <div className="highrisk-amount-sub">{fmtDec(client.tsua_1)}% תשואה</div>
-                ) : null}
+      {/* 6 ─ High-risk option box + Gold card */}
+      <div className="bottom-cards-row">
+        {bestAlt && diffPct > 0 && (
+          <div className="highrisk-card">
+            <div className="highrisk-icon">⚡</div>
+            <div className="highrisk-body">
+              <div className="highrisk-title">מה החמצת?</div>
+              <div className="highrisk-desc">
+                עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-
+                <strong className="highrisk-pct"> {fmtDec(diffPct)}%</strong>
               </div>
-              <div className="highrisk-arrow">←</div>
-              <div className="highrisk-amount-item">
-                <div className="highrisk-amount-label">פוטנציאל</div>
-                <div className="highrisk-amount-val highrisk-amount-val--green">
-                  {bestAlt.potential_amount != null ? `₪${fmt(bestAlt.potential_amount)}` : '—'}
+              <div className="highrisk-amounts">
+                <div className="highrisk-amount-item">
+                  <div className="highrisk-amount-label">היום</div>
+                  <div className="highrisk-amount-val">₪{fmt(client.amount)}</div>
+                  {client.tsua_1 ? (
+                    <div className="highrisk-amount-sub">{fmtDec(client.tsua_1)}% תשואה</div>
+                  ) : null}
                 </div>
-                {bestAlt.tsua_1 ? (
-                  <div className="highrisk-amount-sub">{fmtDec(bestAlt.tsua_1)}% תשואה</div>
-                ) : null}
+                <div className="highrisk-arrow">←</div>
+                <div className="highrisk-amount-item">
+                  <div className="highrisk-amount-label">פוטנציאל</div>
+                  <div className="highrisk-amount-val highrisk-amount-val--green">
+                    {bestAlt.potential_amount != null ? `₪${fmt(bestAlt.potential_amount)}` : '—'}
+                  </div>
+                  {bestAlt.tsua_1 ? (
+                    <div className="highrisk-amount-sub">{fmtDec(bestAlt.tsua_1)}% תשואה</div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {gold && gold.potential_amount != null && (
+          <div className="gold-card">
+            <div className="gold-icon">🏆</div>
+            <div className="gold-body">
+              <div className="gold-title">תפוח הזהב</div>
+              <div className="gold-subtitle">מקום #1 ברמת סיכון גבוהה</div>
+              <div className="gold-desc">
+                אם היית עובר לקופה המובילה בסיכון הגבוה ביותר, הצבירה שלך הייתה גדלה ב-
+                <strong> {fmtDec(gold.diff_percent)}%</strong>
+              </div>
+              <div className="gold-amounts">
+                <div className="gold-amount-item">
+                  <div className="gold-amount-label">היום</div>
+                  <div className="gold-amount-val">₪{fmt(client.amount)}</div>
+                </div>
+                <div className="gold-arrow">←</div>
+                <div className="gold-amount-item">
+                  <div className="gold-amount-label">פוטנציאל</div>
+                  <div className="gold-amount-val gold-amount-val--gold">₪{fmt(gold.potential_amount)}</div>
+                  {gold.tsua_1 && <div className="gold-amount-sub">{fmtDec(gold.tsua_1)}% תשואה</div>}
+                </div>
+              </div>
+              {gold.name && <div className="gold-fund-name">קופה: {gold.name}{gold.id && <span className="gold-fund-id"> · #{gold.id}</span>}</div>}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 7 ─ AmoScore Explanation */}
       <div className="amoscore-explanation">
@@ -894,7 +923,7 @@ async function generatePDF(funds, weights) {
     ${pdfFooter(1, totalPages)}`;
 
   // ── Per-fund pages ──────────────────────────────────────────────────────────
-  const fundPages = funds.map(({ client, alternatives }, fi) => {
+  const fundPages = funds.map(({ client, alternatives, golden }, fi) => {
     const clientIsTop3 = client.rank != null && client.rank <= 3;
     const allRows = [
       { ...client, isClient: true, potential_amount: client.amount, diff: null },
@@ -908,33 +937,40 @@ async function generatePDF(funds, weights) {
 
       return `
         <tr style="background:${bg};">
-          <td style="padding:9px 12px;font-weight:600;color:${PDF_TEXT};">
+          <td style="padding:13px 16px;font-weight:600;color:${PDF_TEXT};font-size:14px;">
             ${f.isClient ? `<span style="color:${clientColor};font-weight:800;">${f.rank ?? idx+1}</span>`
                          : idx + 1}
             ${idx < 3 && !f.isClient
-              ? `<span style="background:#EFF6FF;color:${PDF_BLUE};font-size:9px;
-                  font-weight:700;padding:2px 6px;border-radius:8px;margin-right:4px;">מומלץ</span>`
+              ? `<span style="background:#EFF6FF;color:${PDF_BLUE};font-size:10px;
+                  font-weight:700;padding:3px 7px;border-radius:8px;margin-right:4px;">מומלץ</span>`
               : ''}
           </td>
-          <td style="padding:9px 12px;color:${PDF_TEXT};font-weight:${f.isClient ? '700' : '400'};">
+          <td style="padding:13px 16px;color:${PDF_TEXT};font-weight:${f.isClient ? '700' : '400'};font-size:14px;">
             ${f.name}
+            ${f.hevra ? `<div style="font-size:11px;color:${PDF_MUTED};margin-top:2px;">${f.hevra}</div>` : ''}
+            ${f.id ? `<div style="font-size:11px;color:${PDF_MUTED};">קופה #${f.id}</div>` : ''}
             ${f.isClient
               ? `<span style="background:${clientIsTop3 ? '#EFF6FF' : '#FEF2F2'};
-                  color:${clientColor};font-size:9px;font-weight:700;
-                  padding:2px 6px;border-radius:8px;margin-right:6px;">הקופה שלך</span>`
+                  color:${clientColor};font-size:10px;font-weight:700;
+                  padding:3px 7px;border-radius:8px;margin-right:6px;">הקופה שלך</span>`
               : ''}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};font-weight:600;">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
             ${f.grade ? fmtD(f.grade) : '–'}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
             ${f.tsua_1 != null ? fmtD(f.tsua_1) + '%' : '—'}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
             ${riskMap[client.risk_level] ?? '—'}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};font-weight:600;">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
             ${f.potential_amount != null ? '₪' + fmtN(f.potential_amount) : '—'}
+          </td>
+          <td style="padding:13px 16px;text-align:center;font-weight:700;font-size:14px;
+            color:${f.diff == null ? PDF_MUTED : f.diff >= 0 ? '#16A34A' : '#EF4444'};">
+            ${f.diff == null ? '—' : (f.diff >= 0 ? '+' : '') + '₪' + fmtN(Math.abs(f.diff))
+              + (f.diff_percent != null ? `<div style="font-size:11px;font-weight:600;">${f.diff >= 0 ? '+' : ''}${fmtD(f.diff_percent)}%</div>` : '')}
           </td>
         </tr>`;
     }).join('');
@@ -970,22 +1006,78 @@ async function generatePDF(funds, weights) {
         </div>
       </div>
 
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px;">
         <thead>
           <tr style="background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});">
-            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600;">דירוג</th>
-            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600;">שם הקופה</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">AmoScore</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">תשואה שנתית</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">רמת סיכון</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">סכום פוטנציאלי</th>
+            <th style="padding:13px 16px;text-align:right;color:#fff;font-weight:700;font-size:13px;">דירוג</th>
+            <th style="padding:13px 16px;text-align:right;color:#fff;font-weight:700;font-size:13px;">שם הקופה</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">AmoScore</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">תשואה שנתית</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">רמת סיכון</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">סכום פוטנציאלי</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">הפרש</th>
           </tr>
         </thead>
         <tbody>${rowsHTML}</tbody>
       </table>
-      <div style="font-size:10px;color:${PDF_MUTED};margin-top:6px;">
+      <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:20px;">
         * לא נוכו דמי ניהול חיצוניים מהחישוב
       </div>
+
+      ${(!golden || !golden.potential_amount) && alternatives[0] && (alternatives[0].diff_percent ?? 0) > 0 ? (() => {
+        const best = alternatives[0];
+        return `
+        <div style="display:flex;align-items:flex-start;gap:14px;
+          background:linear-gradient(135deg,rgba(30,27,75,0.08),rgba(49,46,129,0.04));
+          border:1.5px solid rgba(67,56,202,0.3);border-radius:14px;padding:20px 24px;">
+          <div style="font-size:26px;flex-shrink:0;">⚡</div>
+          <div style="flex:1;">
+            <div style="font-size:15px;font-weight:800;color:#4F46E5;margin-bottom:8px;">מה החמצת?</div>
+            <div style="font-size:13px;color:${PDF_MUTED};margin-bottom:14px;line-height:1.6;">
+              עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-<strong style="color:#4F46E5;">${fmtD(best.diff_percent)}%</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:24px;">
+              <div>
+                <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:3px;text-transform:uppercase;letter-spacing:0.06em;">היום</div>
+                <div style="font-size:20px;font-weight:800;color:${PDF_TEXT};">₪${fmtN(client.amount)}</div>
+                ${client.tsua_1 ? `<div style="font-size:11px;color:${PDF_MUTED};">${fmtD(client.tsua_1)}% תשואה</div>` : ''}
+              </div>
+              <div style="font-size:20px;color:#4F46E5;">←</div>
+              <div>
+                <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:3px;text-transform:uppercase;letter-spacing:0.06em;">פוטנציאל</div>
+                <div style="font-size:20px;font-weight:800;color:#16A34A;">₪${fmtN(best.potential_amount)}</div>
+                ${best.tsua_1 ? `<div style="font-size:11px;color:${PDF_MUTED};">${fmtD(best.tsua_1)}% תשואה</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      })() : ''}
+
+      ${golden && golden.potential_amount != null ? `
+      <div style="display:flex;align-items:flex-start;gap:14px;
+        background:linear-gradient(135deg,rgba(120,83,15,0.08),rgba(161,110,20,0.04));
+        border:1.5px solid rgba(234,179,8,0.5);border-radius:14px;padding:20px 24px;">
+        <div style="font-size:26px;flex-shrink:0;">🏆</div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:800;color:#B45309;margin-bottom:2px;">תפוח הזהב</div>
+          <div style="font-size:11px;color:#D97706;font-weight:600;margin-bottom:8px;">מקום #1 ברמת סיכון גבוהה${golden.name ? ' · ' + golden.name : ''}${golden.id ? ' · קופה #' + golden.id : ''}</div>
+          <div style="font-size:13px;color:${PDF_MUTED};margin-bottom:14px;line-height:1.6;">
+            אם היית עובר לקופה המובילה בסיכון הגבוה ביותר, הצבירה שלך הייתה גדלה ב-<strong style="color:#B45309;">${fmtD(golden.diff_percent)}%</strong>
+          </div>
+          <div style="display:flex;align-items:center;gap:24px;">
+            <div>
+              <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:3px;text-transform:uppercase;letter-spacing:0.06em;">היום</div>
+              <div style="font-size:20px;font-weight:800;color:${PDF_TEXT};">₪${fmtN(client.amount)}</div>
+            </div>
+            <div style="font-size:20px;color:#D97706;">←</div>
+            <div>
+              <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:3px;text-transform:uppercase;letter-spacing:0.06em;">פוטנציאל</div>
+              <div style="font-size:20px;font-weight:800;color:#B45309;">₪${fmtN(golden.potential_amount)}</div>
+              ${golden.tsua_1 ? `<div style="font-size:11px;color:#D97706;">${fmtD(golden.tsua_1)}% תשואה</div>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
 
       ${pdfFooter(fi + 2, totalPages)}`;
   });

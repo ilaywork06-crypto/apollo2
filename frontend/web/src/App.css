@@ -869,6 +869,19 @@ body::before {
   direction: rtl;
 }
 
+/* ─── Bottom cards row ───────────────────────────────────────────────────── */
+.bottom-cards-row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.bottom-cards-row .highrisk-card {
+  flex: 1;
+  min-width: 280px;
+}
+
 /* ─── High-risk card ─────────────────────────────────────────────────────── */
 .highrisk-card {
   background: linear-gradient(135deg, rgba(30,27,75,0.27) 0%, rgba(49,46,129,0.13) 100%);
@@ -946,6 +959,109 @@ body::before {
 .highrisk-amount-sub {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* ─── Gold card ───────────────────────────────────────────────────────────── */
+.gold-card {
+  flex: 1;
+  min-width: 280px;
+  background: linear-gradient(135deg, rgba(120,83,15,0.22) 0%, rgba(161,110,20,0.10) 100%);
+  border: 1px solid rgba(234,179,8,0.35);
+  border-radius: 18px;
+  padding: 22px 28px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.gold-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.gold-body {
+  flex: 1;
+}
+
+.gold-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #FBBF24;
+  margin-bottom: 2px;
+}
+
+.gold-subtitle {
+  font-size: 11px;
+  color: #92400E;
+  color: #D97706;
+  margin-bottom: 8px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.gold-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.gold-desc strong {
+  color: #FBBF24;
+  font-weight: 800;
+}
+
+.gold-amounts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gold-arrow {
+  font-size: 20px;
+  color: #FBBF24;
+}
+
+.gold-amount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gold-amount-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.gold-amount-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.gold-amount-val--gold {
+  color: #FBBF24;
+}
+
+.gold-amount-sub {
+  font-size: 11px;
+  color: #D97706;
+}
+
+.gold-fund-name {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #D97706;
+  border-top: 1px solid rgba(234,179,8,0.15);
+  padding-top: 8px;
+}
+
+.gold-fund-id {
+  color: #92400E;
+  opacity: 0.8;
 }
 
 .highrisk-footnote {
