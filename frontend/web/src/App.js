@@ -709,7 +709,7 @@ function FundResults({ data, weights }) {
 
       {/* 6 ─ High-risk option box + Gold card */}
       <div className="bottom-cards-row">
-        {bestAlt && diffPct > 0 && (
+        {bestAlt && diffPct > 0 && client.rank !== 1 && (bestAlt.potential_amount > client.amount) && (
           <div className="highrisk-card">
             <div className="highrisk-icon">⚡</div>
             <div className="highrisk-body">
@@ -741,7 +741,7 @@ function FundResults({ data, weights }) {
           </div>
         )}
 
-        {gold && gold.potential_amount != null && (
+        {gold && gold.potential_amount != null && gold.potential_amount > client.amount && (
           <div className="gold-card">
             <div className="gold-icon">🏆</div>
             <div className="gold-body">
@@ -1024,7 +1024,7 @@ async function generatePDF(funds, weights) {
         * לא נוכו דמי ניהול חיצוניים מהחישוב
       </div>
 
-      ${(!golden || !golden.potential_amount) && alternatives[0] && (alternatives[0].diff_percent ?? 0) > 0 ? (() => {
+      ${(!golden || !golden.potential_amount) && alternatives[0] && client.rank !== 1 && alternatives[0].potential_amount > client.amount ? (() => {
         const best = alternatives[0];
         return `
         <div style="display:flex;align-items:flex-start;gap:14px;
@@ -1053,7 +1053,7 @@ async function generatePDF(funds, weights) {
         </div>`;
       })() : ''}
 
-      ${golden && golden.potential_amount != null ? `
+      ${golden && golden.potential_amount != null && golden.potential_amount > client.amount ? `
       <div style="display:flex;align-items:flex-start;gap:14px;
         background:linear-gradient(135deg,rgba(120,83,15,0.08),rgba(161,110,20,0.04));
         border:1.5px solid rgba(234,179,8,0.5);border-radius:14px;padding:20px 24px;">
