@@ -385,15 +385,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 
         <WeightsForm weights={weights} onChange={onWeightsChange} />
 
-        <div className="product-box">
-          <div className="product-box-label">סוג מוצר להשוואה</div>
-          <div className="product-tags">
-            <span className="product-tag">✓ גמל להשקעה</span>
-            <span className="product-tag">✓ חסכון לכל ילד</span>
-          </div>
-        </div>
-
-        <div className="info-cards">
+<div className="info-cards">
           <div className="info-card">
             <div className="info-icon">📊</div>
             <div className="info-body">
@@ -411,8 +403,8 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           <div className="info-card">
             <div className="info-icon">⚡</div>
             <div className="info-body">
-              <div className="info-title">אופציית סיכון גבוה</div>
-              <div className="info-desc">כמה כסף היה לך עם קופה ברמת סיכון גבוהה יותר</div>
+              <div className="info-title">מה החמצת?</div>
+              <div className="info-desc">כמה כסף יכולת לחסוך אם היית עובר קופה</div>
             </div>
           </div>
         </div>
@@ -720,7 +712,7 @@ function FundResults({ data, weights }) {
         <div className="highrisk-card">
           <div className="highrisk-icon">⚡</div>
           <div className="highrisk-body">
-            <div className="highrisk-title">אופציית סיכון גבוה</div>
+            <div className="highrisk-title">מה החמצת?</div>
             <div className="highrisk-desc">
               עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-
               <strong className="highrisk-pct"> {fmtDec(diffPct)}%</strong>
@@ -1019,7 +1011,9 @@ async function generatePDF(funds, weights) {
   }
 
   const dateStr = today.replace(/\//g, '-');
-  pdf.save(`AmoSight-${dateStr}.pdf`);
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
+  pdf.save(`AmoSight-${dateStr}_${timeStr}.pdf`);
 }
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
@@ -1107,9 +1101,54 @@ function App() {
     const text = await file.text();
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(text, 'text/xml');
-    setViewingFile(xmlDoc);
+    setViewingFile({ doc: xmlDoc, name: file.name });
     setScreen('viewer');
   }, []);
+
+  const handleExportWord = useCallback(() => {
+    if (!viewingFile) return;
+
+    function nodeToHtml(node, depth) {
+      const children = Array.from(node.children || []);
+      const hasChildren = children.length > 0;
+      const textValue = !hasChildren && node.textContent ? node.textContent.trim() : null;
+      const indent = depth * 20;
+      const tag = `<span style="color:#1E40AF;font-family:Consolas,monospace;font-weight:600">${node.tagName}</span>`;
+      const count = hasChildren ? ` <span style="color:#6B7280;font-size:11px">(${children.length})</span>` : '';
+      const val = textValue ? ` <span style="color:#065F46;background:#D1FAE5;padding:1px 6px;border-radius:3px;font-family:Consolas,monospace">${textValue}</span>` : '';
+      const bullet = hasChildren ? '▶ ' : '● ';
+      let html = `<div style="padding-right:${indent}px;margin:2px 0;direction:rtl">${bullet}${tag}${count}${val}</div>`;
+      if (hasChildren) {
+        for (const child of children) html += nodeToHtml(child, depth + 1);
+      }
+      return html;
+    }
+
+    const treeHtml = nodeToHtml(viewingFile.doc.documentElement, 0);
+    const docHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:w="urn:schemas-microsoft-com:office:word"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8">
+      <title>${viewingFile.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; direction: rtl; background: #fff; color: #111; padding: 24px; }
+        h1 { font-size: 18px; color: #1E3A5F; margin-bottom: 16px; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; }
+      </style>
+      </head>
+      <body>
+        <h1>תצוגת קובץ XML — ${viewingFile.name}</h1>
+        ${treeHtml}
+      </body></html>`;
+
+    const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = viewingFile.name.replace(/\.[^.]+$/, '') + '.doc';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [viewingFile]);
 
   const handleAnalyze = async () => {
     setScreen('loading');
@@ -1171,9 +1210,10 @@ function App() {
         <div className="viewer-header">
           <button className="back-btn" onClick={() => setScreen('upload')}>→ חזרה</button>
           <h2>תצוגת קובץ XML</h2>
+          <button className="export-word-btn" onClick={handleExportWord}>⬇ ייצא ל-Word</button>
         </div>
         <div className="viewer-card">
-          <TreeNode node={viewingFile.documentElement} depth={0} />
+          <TreeNode node={viewingFile.doc.documentElement} depth={0} />
         </div>
       </div>
     );

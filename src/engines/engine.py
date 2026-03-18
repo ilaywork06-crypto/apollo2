@@ -135,6 +135,13 @@ def calculate_potential_amount(
     potential = current_amount * (1 + diff / 100)
     return round(potential, 2)
 
+def filter_koput_by_sug(kupot_list, sug):
+    output = []
+    for kupa in kupot_list:
+        SUG_KUPA = kupa["SUG"]
+        if SUG_KUPA == sug:
+            output.append(kupa)
+    return output
 
 def run_comparison(
     mislaka_file,
@@ -150,8 +157,10 @@ def run_comparison(
     matches = find_matching_kupot(mislaka_list, kupot_list)
     output = []
     for mislaka, kupa in matches:
+        sug = kupa["SUG"]
+        our_koput = filter_koput_by_sug(kupot_list, sug)
         risk_level = kupa["risk_level"]
-        all_kopot_in_risk_level = get_kupot_by_risk_level(kupot_list, risk_level)
+        all_kopot_in_risk_level = get_kupot_by_risk_level(our_koput, risk_level)
 
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
         adjusted_kupot = apply_dmey_nihul(copy.deepcopy(all_kopot_in_risk_level), dmey_nihul)

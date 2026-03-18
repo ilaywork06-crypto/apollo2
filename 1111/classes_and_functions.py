@@ -1,4 +1,5 @@
 
+
 # ----- Classes ----- #
 
 
@@ -115,6 +116,7 @@ class DataTable:
         for row in self.rows:
             lines.append(",".join(str(c) for c in row))
         return "\n".join(lines)
+
 
 # ----- Functions ----- #
 

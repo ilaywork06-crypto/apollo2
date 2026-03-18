@@ -4,7 +4,6 @@ import os
 
 # ----- Constants ----- #
 
-DEFAULT_ENCODING = "utf-8"
 API_BASE_URL = "https://api.example.com/v1"
 MAX_UPLOAD_SIZE_MB = 50
 LOG_LEVEL = "INFO"
@@ -19,6 +18,8 @@ PAGINATION_MAX_LIMIT = 100
 EMPTY_RESPONSE_BODY = b""
 DB_MAX_OVERFLOW = 5
 ALLOWED_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
+DEFAULT_ENCODING = "utf-8"
+
 
 # ----- Classes ----- #
 
@@ -80,6 +81,7 @@ class DatabasePool:
 
     def release(self, conn):
         conn["active"] = False
+
 
 # ----- Functions ----- #
 

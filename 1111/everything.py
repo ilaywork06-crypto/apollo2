@@ -18,16 +18,15 @@ import threading
 
 # ----- Constants ----- #
 
-HASH_ALGORITHM = "sha256"
 DEFAULT_PAGE = 1
 APP_VERSION = "2.1.0"
 DEBUG_MODE = True
 RATE_LIMIT = 100
 
+
 # ----- Other ----- #
 
 
-INVENTORY: list[ProductInventory] = []
 REPORT_REGISTRY: dict[str, ReportEngine] = {}
 TOKEN_EXPIRY_SECONDS = 86400
 USERS_STORE: dict[str, dict] = {}
@@ -35,6 +34,8 @@ DEFAULT_PAGE_SIZE = 25
 MAX_CONNECTIONS = 50
 SESSIONS_STORE: dict[str, dict] = {}
 MAX_PAGE_SIZE = 200
+HASH_ALGORITHM = "sha256"
+INVENTORY: list[ProductInventory] = []
 app = FastAPI(title="Chaos App", version=APP_VERSION)
 logger = logging.getLogger(__name__)
 app.add_middleware(
@@ -52,6 +53,7 @@ audit = AuditLogger(
     True,
 )
 _lock = threading.Lock()
+
 
 # ----- Classes ----- #
 
@@ -184,6 +186,7 @@ class ReportEngine:
             else {}
         )
         return {"title": self.title, "data": data, "summary": summary}
+
 
 # ----- Functions ----- #
 

@@ -80,4 +80,5 @@ def parse_mislaka_file(content):
                         "KOD-MEZAHE-YATZRAN": KOD_MEZAHE_YATZRAN.strip(),
                     }
                 )
+    print(list_of_kupot)
     return list_of_kupot

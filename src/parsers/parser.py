@@ -24,8 +24,6 @@ def parse_xml_file(content):
     root = hey.getroot()
     for row in root.findall("Row"):
         SUG_KUPA = extract_data_from_xml("SUG_KUPA", row)
-        if SUG_KUPA != "קופת גמל להשקעה":
-            continue
         ID = extract_data_from_xml("ID", row)
         SHM_KUPA = extract_data_from_xml("SHM_KUPA", row)
         SHM_HEVRA_MENAHELET = extract_data_from_xml("SHM_HEVRA_MENAHELET", row)
@@ -56,6 +54,7 @@ def parse_xml_file(content):
 
         list_of_kupot.append(
             {
+                "SUG": SUG_KUPA.strip(),
                 "ID": ID.strip(),
                 "tsua_mitztaberet_letkufa": TSUA_MITZTABERET_LETKUFA,
                 "sharp_ribit_hasarot_sikun": SHARP_RIBIT_HASRAT_SIKUN,

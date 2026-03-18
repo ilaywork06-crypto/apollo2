@@ -4,10 +4,12 @@ import functools
 import time
 import logging
 
+
 # ----- Other ----- #
 
 
 logger = logging.getLogger(__name__)
+
 
 # ----- Classes ----- #
 
@@ -75,6 +77,7 @@ class DataPipeline:
     def add_step(self, func):
         self.steps.append(func)
         return self
+
 
 # ----- Functions ----- #
 

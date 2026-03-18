@@ -325,6 +325,7 @@ def _inject_header(result: list, header: str, line: str) -> None:
     while result and result[-1].strip() == "":
         result.pop()
     result.append("\n")
+    result.append("\n")
     result.append(header + "\n")
     result.append("\n")
     result.append("\n")

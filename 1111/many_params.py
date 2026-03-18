@@ -1,4 +1,5 @@
 
+
 # ----- Other ----- #
 
 
@@ -57,6 +58,7 @@ request = build_http_request(
     allow_redirects=True,
 )
 
+
 # ----- Functions ----- #
 
 
@@ -98,7 +100,7 @@ def send_notification(
         "from": sender_id,
         "template": template_id,
         "meta": metadata,
-        }
+    }
 
 
 def process_payment(

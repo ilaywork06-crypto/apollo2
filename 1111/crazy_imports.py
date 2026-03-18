@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 import base64
 import hmac
 
+
 # ----- Classes ----- #
 
 
@@ -31,6 +32,7 @@ class RequestContext:
     request_id: str = field(default_factory=generate_request_id)
     user_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
 
 # ----- Functions ----- #
 

@@ -8,16 +8,17 @@ import logging
 
 # ----- Constants ----- #
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventory.db")
+DEFAULT_PAGE_SIZE = 20
+
 
 # ----- Other ----- #
 
 
-ITEMS_DB: list[dict] = []
-DEFAULT_PAGE_SIZE = 20
 USERS_DB: list[dict] = []
 MAX_ITEMS_PER_PAGE = 100
 NEXT_ID = 1
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventory.db")
+ITEMS_DB: list[dict] = []
 app = FastAPI(title="Inventory API")
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 logger = logging.getLogger(__name__)
+
 
 # ----- Classes ----- #
 
@@ -51,6 +53,7 @@ class UserCreate(BaseModel):
     username: str
     email: str
     role: str
+
 
 # ----- Functions ----- #
 
