@@ -887,7 +887,7 @@ async function generatePDF(funds, weights) {
         </div>
       </div>
       <div style="margin-top:14px;font-size:11px;color:#92400E;border-top:1px solid rgba(234,179,8,0.2);padding-top:10px;">
-        השנה החמצת <strong style="color:#B45309;">₪${fmt(totalDiff)}</strong> — עדיין לא מאוחר לשנות
+        השנה החמצת <strong style="color:#B45309;">₪${fmt(totalDiff)}</strong> — עדיין לא מאוחר לעבור
       </div>
     </div>` : ''}
 
@@ -1182,7 +1182,7 @@ function SummaryHero({ results }) {
 
       {hasUpside && (
         <div className="summary-hero-cta">
-          השנה החמצת <strong>₪{fmt(diff)}</strong> — עדיין לא מאוחר לשנות
+          השנה החמצת <strong>₪{fmt(diff)}</strong> — עדיין לא מאוחר לעבור
         </div>
       )}
     </div>
