@@ -8,10 +8,10 @@ from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
 
 # ----- Constants ----- #
 
-GEMEL_NET_PATH = "C:/Users/ilay atia/code/apollo2/src/engines/kupot_gemel_net.xml"
+GEMEL_NET_PATH = "/Users/ilayat11/Desktop/apolo/apollo2/src/engines/kupot_gemel_net.xml"
 
 
-RISKS_MAP_PATH = "C:/Users/ilay atia/code/apollo2/src/engines/risks_map.xml"
+RISKS_MAP_PATH = "/Users/ilayat11/Desktop/apolo/apollo2/src/engines/risks_map.xml"
 
 # ----- Functions ----- #
 
