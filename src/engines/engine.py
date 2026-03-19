@@ -207,7 +207,7 @@ def run_comparison(
             weight_sharp,
         )
             gold_3 = get_top_3(golden_sorted_kupot)
-            better_gold = gold_3[1]
+            better_gold = gold_3[0]
             potential_amount_gold = calculate_potential_amount(
                     money,
                     client_kupa,
