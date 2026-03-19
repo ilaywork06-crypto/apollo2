@@ -226,18 +226,69 @@ def _is_const_line(line: str) -> bool:
 
 
 
+class ImportExtractor(cst.CSTTransformer):
+    """
+    Extracts import statements from inside functions/classes
+    and collects them for hoisting to module level.
+    """
+
+    def __init__(self):
+        self.extracted_imports = []
+        self._depth = 0
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+        self._depth += 1
+        return True
+
+    def leave_FunctionDef(
+        self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
+    ) -> cst.FunctionDef:
+        self._depth -= 1
+        return updated_node
+
+    def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+        self._depth += 1
+        return True
+
+    def leave_ClassDef(
+        self, original_node: cst.ClassDef, updated_node: cst.ClassDef
+    ) -> cst.ClassDef:
+        self._depth -= 1
+        return updated_node
+
+    def leave_SimpleStatementLine(
+        self,
+        original_node: cst.SimpleStatementLine,
+        updated_node: cst.SimpleStatementLine,
+    ) -> cst.SimpleStatementLine | cst.RemovalSentinel:
+        if self._depth > 0 and any(
+            isinstance(s, (cst.Import, cst.ImportFrom)) for s in updated_node.body
+        ):
+            # collect the import (strip indentation for module level)
+            self.extracted_imports.append(
+                updated_node.with_changes(leading_lines=[])
+            )
+            return cst.RemovalSentinel.REMOVE
+        return updated_node
+
+
 def reorder_module(source: str) -> str:
     """
     Physically reorder top-level statements into:
       Imports → Constants → Classes → Functions → Other
 
-    Uses libcst to parse, then rebuilds module.body in the correct order.
+    Also hoists any imports found inside functions/classes to module level.
     Docstring (if present) always stays first.
     """
     try:
         tree = parse_module(source)
     except cst.ParserSyntaxError:
         return source
+
+    # Step 1: extract imports from inside functions/classes
+    extractor = ImportExtractor()
+    tree = tree.visit(extractor)
+    hoisted_imports = extractor.extracted_imports
 
     body = list(tree.body)
 
@@ -257,6 +308,9 @@ def reorder_module(source: str) -> str:
             if isinstance(val, (cst.SimpleString, cst.ConcatenatedString, cst.FormattedString)):
                 docstring = body[0]
                 start = 1
+
+    # Add hoisted imports first
+    imports.extend(hoisted_imports)
 
     for stmt in body[start:]:
         # Imports
@@ -322,11 +376,23 @@ def reorder_module(source: str) -> str:
 
 
 def _inject_header(result: list, header: str, line: str) -> None:
-    """1 blank line before header, 1 blank line after, then the def/class line."""
+    """
+    - 2 blank lines before header if last content is indented (end of class/func body)
+    - 1 blank line before header otherwise
+    - 2 blank lines after header (before class/def)
+    """
     while result and result[-1].strip() == "":
         result.pop()
-    result.append("\n")
+
+    last_content = next((r for r in reversed(result) if r.strip()), "")
+    if last_content.startswith((" ", "\t")):
+        result.append("\n")
+        result.append("\n")
+    else:
+        result.append("\n")
+
     result.append(header + "\n")
+    result.append("\n")
     result.append("\n")
     result.append(line)
 
@@ -429,13 +495,6 @@ def add_section_comments(source: str) -> str:
     functions_header_added = False
     other_header_added = False
 
-    # find which section comes first after imports — that one gets 1 blank line
-    first_after_imports = min(
-        (x for x in [first_const_idx, first_other_idx, first_class_idx, first_func_idx]
-         if x is not None and (last_import_idx is None or x > last_import_idx)),
-        default=None,
-    )
-
     for idx, line in enumerate(lines):
         if idx == first_import_idx:
             while result and result[-1].strip() == "":
@@ -452,7 +511,7 @@ def add_section_comments(source: str) -> str:
             while result and result[-1].strip() == "":
                 result.pop()
             result.append("\n")
-            result.append(_section("Constants") + "\n")
+            result.append(_section("Consts") + "\n")
             result.append("\n")
             result.append(line)
             consts_header_added = True
