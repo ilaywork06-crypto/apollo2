@@ -2,6 +2,8 @@
 
 import xml.etree.ElementTree as ET
 
+from src.parsers.utils import extract_data_from_xml
+
 
 RISKS_DICT = {}
 
@@ -9,7 +11,7 @@ RISKS_DICT = {}
 
 
 def get_risk_level(kupa_id):
-    if kupa_id not in RISKS_DICT.keys():
+    if kupa_id not in RISKS_DICT:
         return "invalid"
     stocks_percentage = RISKS_DICT[kupa_id]
     if stocks_percentage <= 24.9999:
@@ -18,17 +20,6 @@ def get_risk_level(kupa_id):
         return "medium"
     elif stocks_percentage >= 75:
         return "high"
-
-
-def extract_data_from_xml(
-    field_name,
-    row,
-    field_type=str,
-    ):
-    data = row.find(field_name)
-    if data is not None and data.text is not None:
-        return field_type(data.text)
-    return "N/A" if field_type is str else 0.0
 
 
 def get_stocks_percentage_by_kupa_id(content):
