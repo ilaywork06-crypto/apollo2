@@ -2,20 +2,10 @@
 
 import xml.etree.ElementTree as ET
 
-from src.parsers.risk_level_generator import get_risk_level
+from src.core.risk_classifier import get_risk_level
+from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
-
-
-def extract_data_from_xml(
-    field_name,
-    row,
-    field_type=str,
-    ):
-    data = row.find(field_name)
-    if data is not None and data.text is not None:
-        return field_type(data.text)
-    return "N/A" if field_type is str else 0.0
 
 
 def parse_xml_file(content):

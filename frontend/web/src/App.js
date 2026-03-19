@@ -35,7 +35,7 @@ const WEIGHT_FIELDS = [
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 const fmt = n => Math.round(n).toLocaleString('he-IL');
-const fmtDec = (n, d = 1) => (+n).toFixed(d);
+const fmtDec = (n, d = 1) => n != null ? (+n).toFixed(d) : '—';
 const shortName = name => name?.split(' ').slice(0, 3).join(' ') || name;
 
 const formatDate = (dateStr) => {
@@ -361,8 +361,6 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
   const hasFiles = mislakaFiles.length > 0;
   const isDefaultWeights = weights.w1 === DEFAULT_WEIGHTS.w1 && weights.w3 === DEFAULT_WEIGHTS.w3 && weights.w5 === DEFAULT_WEIGHTS.w5 && weights.wSharp === DEFAULT_WEIGHTS.wSharp;
 
-  const sumOk = sum === 100;
-
   return (
     <div className="screen screen--upload">
       <Stars />
@@ -447,11 +445,11 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
             disabled={!ready}
             onClick={onAnalyze}
           >
-            {ready ? '🔍 הפעל ניתוח' : '🔍 הפעל ניתוח'}
+            🔍 הפעל ניתוח
           </button>
           <div className="analyze-status">
             {!hasFiles && <span className="analyze-status-item">· העלה לפחות קובץ אחד</span>}
-            {hasFiles && !sumOk && <span className="analyze-status-item">· המשקלות צריכים להסתכם ל-100% (כרגע {sum}%)</span>}
+            {hasFiles && sum !== 100 && <span className="analyze-status-item">· המשקלות צריכים להסתכם ל-100% (כרגע {sum}%)</span>}
             {ready && <span className="analyze-status-item analyze-status-ready">· מוכן לניתוח</span>}
           </div>
         </div>
@@ -850,9 +848,6 @@ function pdfFooter(pageNum, total) {
 
 async function generatePDF(funds, weights) {
   const today = new Date().toLocaleDateString('he-IL');
-  const fmtN = n => Math.round(n).toLocaleString('he-IL');
-  const fmtD = (n, d = 1) => n != null ? (+n).toFixed(d) : '—';
-  const riskMap = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
   const totalPages = 1 + funds.length;
 
   // ── Summary totals (same logic as SummaryHero) ───────────────────────────────
@@ -877,22 +872,22 @@ async function generatePDF(funds, weights) {
       <div style="display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;">
         <div style="text-align:center;">
           <div style="font-size:10px;color:#78716C;margin-bottom:5px;letter-spacing:0.04em;">צבירה נוכחית</div>
-          <div style="font-size:32px;font-weight:900;color:#F87171;">₪${fmtN(totalCurrent)}</div>
+          <div style="font-size:32px;font-weight:900;color:#F87171;">₪${fmt(totalCurrent)}</div>
         </div>
         <div style="text-align:center;">
           <div style="font-size:22px;color:#D97706;">←</div>
           <div style="background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.45);
             color:#B45309;font-size:12px;font-weight:800;padding:4px 12px;border-radius:999px;margin-top:4px;">
-            +₪${fmtN(totalDiff)} (${fmtD(totalDiffPct)}%)
+            +₪${fmt(totalDiff)} (${fmtDec(totalDiffPct)}%)
           </div>
         </div>
         <div style="text-align:center;">
           <div style="font-size:10px;color:#78716C;margin-bottom:5px;letter-spacing:0.04em;">פוטנציאל אם תעבור עכשיו</div>
-          <div style="font-size:32px;font-weight:900;color:#D97706;">₪${fmtN(totalPotential)}</div>
+          <div style="font-size:32px;font-weight:900;color:#D97706;">₪${fmt(totalPotential)}</div>
         </div>
       </div>
       <div style="margin-top:14px;font-size:11px;color:#92400E;border-top:1px solid rgba(234,179,8,0.2);padding-top:10px;">
-        השנה החמצת <strong style="color:#B45309;">₪${fmtN(totalDiff)}</strong> — עדיין לא מאוחר לשנות
+        השנה החמצת <strong style="color:#B45309;">₪${fmt(totalDiff)}</strong> — עדיין לא מאוחר לעבור
       </div>
     </div>` : ''}
 
@@ -950,21 +945,21 @@ async function generatePDF(funds, weights) {
               : ''}
           </td>
           <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
-            ${f.grade ? fmtD(f.grade) : '–'}
+            ${f.grade ? fmtDec(f.grade) : '–'}
           </td>
           <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
-            ${f.tsua_1 != null ? fmtD(f.tsua_1) + '%' : '—'}
+            ${f.tsua_1 != null ? fmtDec(f.tsua_1) + '%' : '—'}
           </td>
           <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
-            ${riskMap[client.risk_level] ?? '—'}
+            ${RISK_LABELS[client.risk_level] ?? '—'}
           </td>
           <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
-            ${f.potential_amount != null ? '₪' + fmtN(f.potential_amount) : '—'}
+            ${f.potential_amount != null ? '₪' + fmt(f.potential_amount) : '—'}
           </td>
           <td style="padding:13px 16px;text-align:center;font-weight:700;font-size:14px;
             color:${f.diff == null ? PDF_MUTED : f.diff >= 0 ? '#16A34A' : '#EF4444'};">
-            ${f.diff == null ? '—' : (f.diff >= 0 ? '+' : '') + '₪' + fmtN(Math.abs(f.diff))
-              + (f.diff_percent != null ? `<div style="font-size:11px;font-weight:600;">${f.diff >= 0 ? '+' : ''}${fmtD(f.diff_percent)}%</div>` : '')}
+            ${f.diff == null ? '—' : (f.diff >= 0 ? '+' : '') + '₪' + fmt(Math.abs(f.diff))
+              + (f.diff_percent != null ? `<div style="font-size:11px;font-weight:600;">${f.diff >= 0 ? '+' : ''}${fmtDec(f.diff_percent)}%</div>` : '')}
           </td>
         </tr>`;
     }).join('');
@@ -982,15 +977,15 @@ async function generatePDF(funds, weights) {
         <div style="font-size:12px;color:${PDF_MUTED};margin-bottom:14px;">
           קופה #${client.id}
           ${client.hevra ? ' · ' + client.hevra : ''}
-          ${client.risk_level ? ' · רמת סיכון: ' + (riskMap[client.risk_level] ?? client.risk_level) : ''}
+          ${client.risk_level ? ' · רמת סיכון: ' + (RISK_LABELS[client.risk_level] ?? client.risk_level) : ''}
           ${client.rank != null ? ' · מקום ' + client.rank + ' מתוך ' + client.total_in_risk + ' קופות' : ''}
         </div>
         <div style="display:flex;gap:20px;">
           ${[
-            ['סכום צבירה',     '₪' + fmtN(client.amount)],
-            ['תשואה שנתית',    client.tsua_1 ? fmtD(client.tsua_1) + '%' : 'N/A'],
-            ['AmoScore',       client.grade ? fmtD(client.grade) : '–'],
-            ['דמי ניהול',      client.dmei_nihul != null ? fmtD(client.dmei_nihul, 2) + '%' : '—'],
+            ['סכום צבירה',     '₪' + fmt(client.amount)],
+            ['תשואה שנתית',    client.tsua_1 ? fmtDec(client.tsua_1) + '%' : 'N/A'],
+            ['AmoScore',       client.grade ? fmtDec(client.grade) : '–'],
+            ['דמי ניהול',      client.dmei_nihul != null ? fmtDec(client.dmei_nihul, 2) + '%' : '—'],
           ].map(([label, val]) => `
             <div style="flex:1;background:#fff;border:1px solid #DBEAFE;
               border-radius:8px;padding:12px;text-align:center;">
@@ -1031,19 +1026,19 @@ async function generatePDF(funds, weights) {
             <div style="flex:1;">
               <div style="font-size:13px;font-weight:800;color:#4F46E5;margin-bottom:5px;">מה החמצת?</div>
               <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:10px;line-height:1.5;">
-                מעבר לקופה המובילה היה מגדיל ב-<strong style="color:#4F46E5;">${fmtD(best.diff_percent)}%</strong>
+                מעבר לקופה המובילה היה מגדיל ב-<strong style="color:#4F46E5;">${fmtDec(best.diff_percent)}%</strong>
               </div>
               <div style="display:flex;align-items:flex-start;gap:14px;">
                 <div>
                   <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">היום</div>
-                  <div style="font-size:16px;font-weight:800;color:${PDF_TEXT};">₪${fmtN(client.amount)}</div>
-                  ${client.tsua_1 ? `<div style="font-size:9px;color:${PDF_MUTED};">${fmtD(client.tsua_1)}%</div>` : ''}
+                  <div style="font-size:16px;font-weight:800;color:${PDF_TEXT};">₪${fmt(client.amount)}</div>
+                  ${client.tsua_1 ? `<div style="font-size:9px;color:${PDF_MUTED};">${fmtDec(client.tsua_1)}%</div>` : ''}
                 </div>
                 <div style="font-size:16px;color:#4F46E5;margin-top:12px;">←</div>
                 <div>
                   <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">פוטנציאל</div>
-                  <div style="font-size:16px;font-weight:800;color:#16A34A;">₪${fmtN(best.potential_amount)}</div>
-                  ${best.tsua_1 ? `<div style="font-size:9px;color:${PDF_MUTED};">${fmtD(best.tsua_1)}%</div>` : ''}
+                  <div style="font-size:16px;font-weight:800;color:#16A34A;">₪${fmt(best.potential_amount)}</div>
+                  ${best.tsua_1 ? `<div style="font-size:9px;color:${PDF_MUTED};">${fmtDec(best.tsua_1)}%</div>` : ''}
                 </div>
               </div>
             </div>
@@ -1057,18 +1052,18 @@ async function generatePDF(funds, weights) {
               <div style="font-size:13px;font-weight:800;color:#B45309;margin-bottom:2px;">תפוח הזהב</div>
               <div style="font-size:9px;color:#D97706;font-weight:600;margin-bottom:8px;">מקום #1 סיכון גבוה${golden.name ? ' · ' + golden.name : ''}${golden.id ? ' · #' + golden.id : ''}</div>
               <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:10px;line-height:1.5;">
-                מעבר לסיכון גבוה הייתה מגדילה ב-<strong style="color:#B45309;">${fmtD(golden.diff_percent)}%</strong>
+                מעבר לסיכון גבוה הייתה מגדילה ב-<strong style="color:#B45309;">${fmtDec(golden.diff_percent)}%</strong>
               </div>
               <div style="display:flex;align-items:flex-start;gap:14px;">
                 <div>
                   <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">היום</div>
-                  <div style="font-size:16px;font-weight:800;color:${PDF_TEXT};">₪${fmtN(client.amount)}</div>
+                  <div style="font-size:16px;font-weight:800;color:${PDF_TEXT};">₪${fmt(client.amount)}</div>
                 </div>
                 <div style="font-size:16px;color:#D97706;margin-top:12px;">←</div>
                 <div>
                   <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">פוטנציאל</div>
-                  <div style="font-size:16px;font-weight:800;color:#B45309;">₪${fmtN(golden.potential_amount)}</div>
-                  ${golden.tsua_1 ? `<div style="font-size:9px;color:#D97706;">${fmtD(golden.tsua_1)}%</div>` : ''}
+                  <div style="font-size:16px;font-weight:800;color:#B45309;">₪${fmt(golden.potential_amount)}</div>
+                  ${golden.tsua_1 ? `<div style="font-size:9px;color:#D97706;">${fmtDec(golden.tsua_1)}%</div>` : ''}
                 </div>
               </div>
             </div>
@@ -1148,8 +1143,6 @@ function SummaryHero({ results }) {
   const diff           = totalPotential - totalCurrent;
   const diffPct        = totalCurrent > 0 ? (diff / totalCurrent) * 100 : 0;
   const hasUpside      = diff > 0;
-  const fmt            = n => Math.round(n).toLocaleString('he-IL');
-  const fmtD           = n => (+n).toFixed(1);
 
   return (
     <div className="summary-hero">
@@ -1170,7 +1163,7 @@ function SummaryHero({ results }) {
             <div className="summary-hero-arrow-wrap">
               <span className="summary-hero-arrow">←</span>
               <span className="summary-hero-diff-badge">
-                +₪{fmt(diff)}<span className="summary-hero-diff-pct"> ({fmtD(diffPct)}%)</span>
+                +₪{fmt(diff)}<span className="summary-hero-diff-pct"> ({fmtDec(diffPct)}%)</span>
               </span>
             </div>
           ) : (
@@ -1189,7 +1182,7 @@ function SummaryHero({ results }) {
 
       {hasUpside && (
         <div className="summary-hero-cta">
-          השנה החמצת <strong>₪{fmt(diff)}</strong> — עדיין לא מאוחר לשנות
+          השנה החמצת <strong>₪{fmt(diff)}</strong> — עדיין לא מאוחר לעבור
         </div>
       )}
     </div>
