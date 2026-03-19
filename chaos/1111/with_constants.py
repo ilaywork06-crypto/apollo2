@@ -4,10 +4,6 @@ import os
 
 # ----- Constants ----- #
 
-ENABLE_FEATURE_FLAGS = True
-SESSION_TIMEOUT_SECONDS = 3600
-PAGINATION_MAX_LIMIT = 100
-ALLOWED_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 DB_MAX_OVERFLOW = 5
 MAX_RETRIES = 3
 DEFAULT_ENCODING = "utf-8"
@@ -19,10 +15,12 @@ EMPTY_RESPONSE_BODY = b""
 RATE_LIMIT_PER_MINUTE = 60
 DB_POOL_SIZE = 10
 SUPPORTED_FORMATS = ("json", "xml", "csv")
-
+ENABLE_FEATURE_FLAGS = True
+SESSION_TIMEOUT_SECONDS = 3600
+PAGINATION_MAX_LIMIT = 100
+ALLOWED_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 
 # ----- Classes ----- #
-
 
 class ConfigLoader:
     def __init__(self, path):
@@ -82,9 +80,7 @@ class DatabasePool:
     def release(self, conn):
         conn["active"] = False
 
-
 # ----- Functions ----- #
-
 
 def connect_to_service(host, port):
     INTERNAL_TIMEOUT = 30

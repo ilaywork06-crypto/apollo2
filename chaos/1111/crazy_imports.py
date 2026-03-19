@@ -17,9 +17,7 @@ from dataclasses import dataclass, field
 import base64
 import hmac
 
-
 # ----- Classes ----- #
-
 
 class AppConfig(BaseModel):
     host: str
@@ -33,9 +31,7 @@ class RequestContext:
     user_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
-
 # ----- Functions ----- #
-
 
 def get_environment():
     return os.environ.copy()

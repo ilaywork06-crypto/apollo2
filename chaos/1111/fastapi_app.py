@@ -12,13 +12,11 @@ DEFAULT_PAGE_SIZE = 20
 NEXT_ID = 1
 MAX_ITEMS_PER_PAGE = 100
 
-
 # ----- Other ----- #
 
-
 ITEMS_DB: list[dict] = []
-USERS_DB: list[dict] = []
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventory.db")
+USERS_DB: list[dict] = []
 app = FastAPI(title="Inventory API")
 app.add_middleware(
     CORSMiddleware,
@@ -28,9 +26,7 @@ app.add_middleware(
 )
 logger = logging.getLogger(__name__)
 
-
 # ----- Classes ----- #
-
 
 class ItemCreate(BaseModel):
     name: str
@@ -54,9 +50,7 @@ class UserCreate(BaseModel):
     email: str
     role: str
 
-
 # ----- Functions ----- #
-
 
 @app.get("/health")
 def health_check():

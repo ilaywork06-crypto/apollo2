@@ -322,9 +322,19 @@ def reorder_module(source: str) -> str:
 
 
 def _inject_header(result: list, header: str, line: str) -> None:
+    """1 blank line before header, 1 blank line after, then the def/class line."""
     while result and result[-1].strip() == "":
         result.pop()
     result.append("\n")
+    result.append(header + "\n")
+    result.append("\n")
+    result.append(line)
+
+
+def _inject_header_after_imports(result: list, header: str, line: str) -> None:
+    """1 blank line before header (used right after import block), 2 blank lines after."""
+    while result and result[-1].strip() == "":
+        result.pop()
     result.append("\n")
     result.append(header + "\n")
     result.append("\n")
@@ -419,6 +429,13 @@ def add_section_comments(source: str) -> str:
     functions_header_added = False
     other_header_added = False
 
+    # find which section comes first after imports — that one gets 1 blank line
+    first_after_imports = min(
+        (x for x in [first_const_idx, first_other_idx, first_class_idx, first_func_idx]
+         if x is not None and (last_import_idx is None or x > last_import_idx)),
+        default=None,
+    )
+
     for idx, line in enumerate(lines):
         if idx == first_import_idx:
             while result and result[-1].strip() == "":
@@ -452,13 +469,18 @@ def add_section_comments(source: str) -> str:
             continue
 
         if idx == first_other_idx and not other_header_added:
-            _inject_header(result, _section("Other"), line)
+            while result and result[-1].strip() == "":
+                result.pop()
+            result.append("\n")
+            result.append(_section("Other") + "\n")
+            result.append("\n")
+            result.append(line)
             other_header_added = True
             continue
 
         result.append(line)
 
-    return "".join(result)
+    return "".join(result).lstrip("\n")
 
 
 def strip_sections_from_file(path: Path) -> None:
@@ -504,6 +526,9 @@ def format_source(source: str) -> str:
 
     if not result.endswith("\n"):
         result += "\n"
+
+    # Remove leading blank lines
+    result = result.lstrip("\n")
 
     return result
 

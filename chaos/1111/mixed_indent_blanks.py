@@ -1,7 +1,4 @@
-
-
 # ----- Functions ----- #
-
 
 def validate_age(age):
     if age < 0:
@@ -33,14 +30,14 @@ def parse_int(value, default):
     try:
         return int(value)
 
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
 def parse_float(value, default):
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 

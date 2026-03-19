@@ -1,7 +1,4 @@
-
-
 # ----- Other ----- #
-
 
 result = create_user(
     "jsmith",
@@ -58,9 +55,7 @@ request = build_http_request(
     allow_redirects=True,
 )
 
-
 # ----- Functions ----- #
-
 
 def create_user(
     username,

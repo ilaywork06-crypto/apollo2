@@ -18,23 +18,21 @@ import threading
 
 # ----- Constants ----- #
 
-RATE_LIMIT = 100
-TOKEN_EXPIRY_SECONDS = 86400
-DEFAULT_PAGE_SIZE = 25
-MAX_PAGE_SIZE = 200
 APP_VERSION = "2.1.0"
 MAX_CONNECTIONS = 50
 HASH_ALGORITHM = "sha256"
-
+DEFAULT_PAGE = 1
+DEBUG_MODE = True
+RATE_LIMIT = 100
 
 # ----- Other ----- #
 
-
 USERS_STORE: dict[str, dict] = {}
-DEFAULT_PAGE = 1
+TOKEN_EXPIRY_SECONDS = 86400
 INVENTORY: list[ProductInventory] = []
+DEFAULT_PAGE_SIZE = 25
 REPORT_REGISTRY: dict[str, ReportEngine] = {}
-DEBUG_MODE = True
+MAX_PAGE_SIZE = 200
 SESSIONS_STORE: dict[str, dict] = {}
 app = FastAPI(title="Chaos App", version=APP_VERSION)
 logger = logging.getLogger(__name__)
@@ -54,9 +52,7 @@ audit = AuditLogger(
 )
 _lock = threading.Lock()
 
-
 # ----- Classes ----- #
-
 
 class UserCredentials(BaseModel):
     username: str
@@ -190,9 +186,7 @@ class ReportEngine:
         )
         return {"title": self.title, "data": data, "summary": summary}
 
-
 # ----- Functions ----- #
-
 
 def normalize_text(
     text,

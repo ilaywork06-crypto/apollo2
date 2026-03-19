@@ -1,7 +1,4 @@
-
-
 # ----- Classes ----- #
-
 
 class UserAccount:
     def __init__(

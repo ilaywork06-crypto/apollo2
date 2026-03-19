@@ -11,17 +11,13 @@ from classes_and_functions import (
 )
 import unittest
 
-
 # ----- Other ----- #
-
 
 sys.path.insert(0, os.path.dirname(__file__))
 if __name__ == "__main__":
     unittest.main()
 
-
 # ----- Classes ----- #
-
 
 class TestUserProfile(unittest.TestCase):
     def test_init_stores_attributes(self):
@@ -29,7 +25,7 @@ class TestUserProfile(unittest.TestCase):
             user_id=1,
             username="john_doe",
             email="john@example.com",
-            )
+        )
         self.assertEqual(profile.user_id, 1)
         self.assertEqual(profile.email, "john@example.com")
 
@@ -39,7 +35,6 @@ class TestUserProfile(unittest.TestCase):
             user_id=2,
             username="  Jane Doe  ",
             email="jane@example.com",
-            
         )
         self.assertEqual(profile.username, "jane_doe")
 
@@ -48,7 +43,7 @@ class TestUserProfile(unittest.TestCase):
             user_id=1,
             username="john_doe",
             email="john@example.com",
-            )
+        )
         self.assertEqual(profile.display_name(), "John Doe")
 
     def test_display_name_single_word(self):
@@ -56,7 +51,7 @@ class TestUserProfile(unittest.TestCase):
             user_id=3,
             username="alice",
             email="alice@example.com",
-            )
+        )
         self.assertEqual(profile.display_name(), "Alice")
 
     def test_display_name_already_titlecase_username(self):
@@ -64,7 +59,7 @@ class TestUserProfile(unittest.TestCase):
             user_id=4,
             username="Bob_Smith",
             email="bob@example.com",
-            )
+        )
         # normalize_username lowercases first, then display_name titles
         self.assertEqual(profile.display_name(), "Bob Smith")
 
@@ -78,7 +73,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.75,
             age=30,
             notes="",
-            
         )
         # 50 kg, 1.75 m → BMI ≈ 16.33 (underweight)
         self.underweight = HealthRecord(
@@ -87,7 +81,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.75,
             age=25,
             notes="",
-            
         )
         # 80 kg, 1.65 m → BMI ≈ 29.38 (overweight)
         self.overweight = HealthRecord(
@@ -96,7 +89,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.65,
             age=40,
             notes="",
-            
         )
         # 100 kg, 1.70 m → BMI ≈ 34.60 (obese)
         self.obese = HealthRecord(
@@ -105,7 +97,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.70,
             age=45,
             notes="",
-            
         )
 
     def test_bmi_calculation(self):
@@ -114,7 +105,7 @@ class TestHealthRecord(unittest.TestCase):
             self.normal.bmi(),
             expected,
             places=5,
-            )
+        )
 
     def test_bmi_category_normal(self):
         self.assertEqual(self.normal.bmi_category(), "normal")
@@ -137,7 +128,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.0,
             age=20,
             notes="",
-            
         )
         self.assertEqual(record.bmi_category(), "normal")
 
@@ -149,7 +139,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.0,
             age=20,
             notes="",
-            
         )
         self.assertEqual(record.bmi_category(), "overweight")
 
@@ -161,7 +150,6 @@ class TestHealthRecord(unittest.TestCase):
             height=1.0,
             age=20,
             notes="",
-            
         )
         self.assertEqual(record.bmi_category(), "obese")
 
@@ -173,21 +161,18 @@ class TestLocation(unittest.TestCase):
             latitude=51.5074,
             longitude=-0.1278,
             country_code="GB",
-            
         )
         self.paris = Location(
             name="Paris",
             latitude=48.8566,
             longitude=2.3522,
             country_code="FR",
-            
         )
         self.same = Location(
             name="London Copy",
             latitude=51.5074,
             longitude=-0.1278,
             country_code="GB",
-            
         )
 
     def test_init_stores_attributes(self):
@@ -203,7 +188,7 @@ class TestLocation(unittest.TestCase):
             dist,
             340,
             delta=10,
-            )
+        )
 
     def test_distance_to_same_location_is_zero(self):
         dist = self.london.distance_to(self.same)
@@ -211,7 +196,7 @@ class TestLocation(unittest.TestCase):
             dist,
             0.0,
             places=5,
-            )
+        )
 
     def test_distance_is_symmetric(self):
         d1 = self.london.distance_to(self.paris)
@@ -220,7 +205,7 @@ class TestLocation(unittest.TestCase):
             d1,
             d2,
             places=5,
-            )
+        )
 
     def test_formatted(self):
         self.assertEqual(self.london.formatted(), "London (GB)")
@@ -240,7 +225,6 @@ class TestPaginatedResponse(unittest.TestCase):
             total=total,
             page=page,
             page_size=page_size,
-            
         )
 
     def test_has_next_true_when_more_pages(self):
@@ -248,7 +232,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=30,
             page=1,
             page_size=10,
-            )
+        )
         self.assertTrue(resp.has_next())
 
     def test_has_next_false_on_last_page(self):
@@ -256,7 +240,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=30,
             page=3,
             page_size=10,
-            )
+        )
         self.assertFalse(resp.has_next())
 
     def test_has_next_false_when_total_fits_single_page(self):
@@ -264,7 +248,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=5,
             page=1,
             page_size=10,
-            )
+        )
         self.assertFalse(resp.has_next())
 
     def test_has_prev_false_on_first_page(self):
@@ -272,7 +256,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=30,
             page=1,
             page_size=10,
-            )
+        )
         self.assertFalse(resp.has_prev())
 
     def test_has_prev_true_on_second_page(self):
@@ -280,7 +264,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=30,
             page=2,
             page_size=10,
-            )
+        )
         self.assertTrue(resp.has_prev())
 
     def test_has_prev_true_on_last_page(self):
@@ -288,7 +272,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=30,
             page=3,
             page_size=10,
-            )
+        )
         self.assertTrue(resp.has_prev())
 
     def test_single_page_no_next_no_prev(self):
@@ -296,7 +280,7 @@ class TestPaginatedResponse(unittest.TestCase):
             total=3,
             page=1,
             page_size=10,
-            )
+        )
         self.assertFalse(resp.has_next())
         self.assertFalse(resp.has_prev())
 
@@ -314,7 +298,7 @@ class TestDataTable(unittest.TestCase):
             columns=self.columns,
             rows=self.rows,
             title="People",
-            )
+        )
 
     def test_filter_rows_returns_matching_rows(self):
         result = self.table.filter_rows("city", "NYC")
@@ -354,6 +338,6 @@ class TestDataTable(unittest.TestCase):
             columns=["x", "y"],
             rows=[],
             title="Empty",
-            )
+        )
         csv = empty.to_csv()
         self.assertEqual(csv, "x,y")

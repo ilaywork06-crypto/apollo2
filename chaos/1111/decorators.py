@@ -4,15 +4,11 @@ import functools
 import time
 import logging
 
-
 # ----- Other ----- #
-
 
 logger = logging.getLogger(__name__)
 
-
 # ----- Classes ----- #
-
 
 class cache_result:
     def __init__(self, ttl_seconds):
@@ -79,9 +75,7 @@ class DataPipeline:
         self.steps.append(func)
         return self
 
-
 # ----- Functions ----- #
-
 
 def retry(max_attempts, delay_seconds):
     def decorator(func):

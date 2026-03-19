@@ -1,7 +1,4 @@
-
-
 # ----- Classes ----- #
-
 
 class UserProfile:
     def __init__(
@@ -117,9 +114,7 @@ class DataTable:
             lines.append(",".join(str(c) for c in row))
         return "\n".join(lines)
 
-
 # ----- Functions ----- #
-
 
 def normalize_username(username):
     return username.strip().lower().replace(" ", "_")
