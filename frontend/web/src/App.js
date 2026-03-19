@@ -1080,60 +1080,55 @@ async function generatePDF(funds, weights) {
       ${pdfFooter(fi + 2, totalPages)}`;
   });
 
-  // ── Single render: all pages in one container → one html2canvas call ────────
-  const container = document.createElement('div');
-  container.style.cssText = `position:absolute;top:0;left:-9999px;width:794px;background:#ffffff;direction:rtl;font-family:'Rubik',Arial,sans-serif;color:${PDF_TEXT};`;
+  // ── Per-page render: one small html2canvas per page (much faster for many funds) ──
+  const pdf   = new jsPDF('p', 'mm', 'a4');
+  const pageW = 210, pageH = 297;
+  const allPages = [coverHTML, ...fundPages];
+  const pageStyle = `padding:40px 48px;box-sizing:border-box;background:#ffffff;`;
+  const wrapStyle = `position:absolute;top:0;left:-9999px;width:794px;background:#ffffff;direction:rtl;font-family:'Rubik',Arial,sans-serif;color:${PDF_TEXT};`;
 
-  [coverHTML, ...fundPages].forEach(html => {
-    const page = document.createElement('div');
-    page.style.cssText = `padding:40px 48px;box-sizing:border-box;background:#ffffff;`;
-    page.innerHTML = html;
-    container.appendChild(page);
-  });
-
-  document.body.appendChild(container);
   await document.fonts.ready;
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  try {
-    const pages       = Array.from(container.children);
-    const pageHeights = pages.map(p => p.offsetHeight);
+  let firstPage = true;
+  for (const html of allPages) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = wrapStyle;
+    const page = document.createElement('div');
+    page.style.cssText = pageStyle;
+    page.innerHTML = html;
+    wrap.appendChild(page);
+    document.body.appendChild(wrap);
 
-    const canvas = await html2canvas(container, {
-      scale: 1.5, backgroundColor: '#ffffff',
-      useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 794,
-    });
+    // One RAF to let the browser paint before capture
+    await new Promise(r => requestAnimationFrame(r));
 
-    const pdf   = new jsPDF('p', 'mm', 'a4');
-    const pageW = 210, pageH = 297;
-    const sx    = canvas.width / 794;
-    let yOff    = 0;
+    try {
+      const canvas = await html2canvas(wrap, {
+        scale: 1.5, backgroundColor: '#ffffff',
+        useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 794,
+      });
 
-    for (let i = 0; i < pages.length; i++) {
-      if (i > 0) pdf.addPage();
-      const ph    = pageHeights[i];
-      const slice = document.createElement('canvas');
-      slice.width  = canvas.width;
-      slice.height = Math.round(ph * sx);
-      slice.getContext('2d').drawImage(canvas, 0, Math.round(yOff * sx), canvas.width, Math.round(ph * sx), 0, 0, canvas.width, Math.round(ph * sx));
-      const imgData = slice.toDataURL('image/jpeg', 0.88);
-      const imgH    = (slice.height * pageW) / slice.width;
+      const imgData = canvas.toDataURL('image/jpeg', 0.88);
+      const imgH    = (canvas.height * pageW) / canvas.width;
+
+      if (!firstPage) pdf.addPage();
+      firstPage = false;
+
       let y = 0;
       while (y < imgH) {
         if (y > 0) pdf.addPage();
         pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH);
         y += pageH;
       }
-      yOff += ph;
+    } finally {
+      document.body.removeChild(wrap);
     }
-
-    const dateStr = today.replace(/\//g, '-');
-    const now     = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
-    pdf.save(`AmoSight-${dateStr}_${timeStr}.pdf`);
-  } finally {
-    document.body.removeChild(container);
   }
+
+  const dateStr = today.replace(/\//g, '-');
+  const now     = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
+  pdf.save(`AmoSight-${dateStr}_${timeStr}.pdf`);
 }
 
 // ─── Summary Hero helpers ─────────────────────────────────────────────────────
