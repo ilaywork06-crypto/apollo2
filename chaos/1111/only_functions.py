@@ -28,7 +28,12 @@ def send_email(
     sender,
     reply_to,
     ):
-    headers = {"From": sender, "To": recipient, "Subject": subject, "Reply-To": reply_to}
+    headers = {
+        "From": sender,
+        "To": recipient,
+        "Subject": subject,
+        "Reply-To": reply_to,
+    }
     return headers
 
 
@@ -70,7 +75,7 @@ def hash_password(
         password.encode(),
         salt.encode(),
         iterations,
-        ).hex()
+    ).hex()
 
 
 def check_password(
@@ -80,12 +85,15 @@ def check_password(
     iterations,
     algorithm,
     ):
-    return hash_password(
-        password,
-        salt,
-        iterations,
-        algorithm,
-        ) == hashed
+    return (
+        hash_password(
+            password,
+            salt,
+            iterations,
+            algorithm,
+        )
+        == hashed
+    )
 
 
 def generate_token():
@@ -126,11 +134,14 @@ def flatten_list(nested_list):
 
 
 def chunk_list(lst, chunk_size):
-    return [lst[i : i + chunk_size] for i in range(
-        0,
-        len(lst),
-        chunk_size,
-        )]
+    return [
+        lst[i : i + chunk_size]
+        for i in range(
+            0,
+            len(lst),
+            chunk_size,
+        )
+    ]
 
 
 def read_config(
@@ -163,7 +174,7 @@ def write_json(
             indent=indent,
             ensure_ascii=ensure_ascii,
             sort_keys=sort_keys,
-            )
+        )
 
 
 def merge_dicts(base, override):

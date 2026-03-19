@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # בג apollo2 % python3 -m src.api.app
 import uvicorn
 
-from src.engines.engine import run_comparison
+from src.core.engine import run_comparison
 
 
 APP = FastAPI()

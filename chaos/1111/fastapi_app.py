@@ -8,25 +8,25 @@ import logging
 
 # ----- Constants ----- #
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventory.db")
 DEFAULT_PAGE_SIZE = 20
 NEXT_ID = 1
+MAX_ITEMS_PER_PAGE = 100
 
 
 # ----- Other ----- #
 
 
+ITEMS_DB: list[dict] = []
+USERS_DB: list[dict] = []
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventory.db")
 app = FastAPI(title="Inventory API")
-MAX_ITEMS_PER_PAGE = 100
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    )
+)
 logger = logging.getLogger(__name__)
-ITEMS_DB: list[dict] = []
-USERS_DB: list[dict] = []
 
 
 # ----- Classes ----- #
@@ -67,7 +67,7 @@ def health_check():
     "/items",
     response_model=ItemResponse,
     status_code=status.HTTP_201_CREATED,
-    )
+)
 def create_item(item: ItemCreate):
     global NEXT_ID
     record = {

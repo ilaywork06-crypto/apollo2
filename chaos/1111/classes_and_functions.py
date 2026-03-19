@@ -66,7 +66,7 @@ class Location:
             self.longitude,
             other.latitude,
             other.longitude,
-            )
+        )
 
     def formatted(self):
         return f"{self.name} ({self.country_code})"
@@ -155,7 +155,9 @@ def distance_km(
     dlon = math.radians(lon2 - lon1)
     a = (
         math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
     )
     return r * 2 * math.asin(math.sqrt(a))
 
@@ -178,7 +180,7 @@ def sort_by_field(
         records,
         key=lambda r: r.get(field),
         reverse=reverse,
-        )
+    )
 
 
 def group_by(records, key_field):

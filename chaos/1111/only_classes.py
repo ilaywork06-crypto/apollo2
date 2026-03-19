@@ -22,7 +22,11 @@ class UserAccount:
         self.is_active = False
 
     def to_dict(self):
-        return {"username": self.username, "email": self.email, "active": self.is_active}
+        return {
+            "username": self.username,
+            "email": self.email,
+            "active": self.is_active,
+        }
 
 
 class ProductCatalog:
@@ -117,14 +121,16 @@ class EmailService:
             0,
             len(recipients),
             batch_size,
-            ):
+        ):
             batch = recipients[i : i + batch_size]
             for r in batch:
-                results.append(self.send(
-                    r,
-                    subject,
-                    body,
-                    ))
+                results.append(
+                    self.send(
+                        r,
+                        subject,
+                        body,
+                    )
+                )
         return results
 
 
@@ -188,7 +194,11 @@ class ReportGenerator:
         self.sections.append({"heading": heading, "content": content})
 
     def render(self):
-        return {"title": self.title, "sections": self.sections, "format": self.format_type}
+        return {
+            "title": self.title,
+            "sections": self.sections,
+            "format": self.format_type,
+        }
 
 
 class DatabaseConnection:

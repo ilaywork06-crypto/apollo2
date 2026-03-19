@@ -4,7 +4,7 @@ import re
 
 import lxml.etree as ET
 
-from src.parsers.utils import extract_data_from_xml
+from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
 

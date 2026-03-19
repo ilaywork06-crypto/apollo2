@@ -12,7 +12,6 @@ result = create_user(
     "admin",
     True,
     "system",
-    
 )
 payment = process_payment(
     "ORD-001",
@@ -45,7 +44,7 @@ export = export_dataset(
     True,
     False,
     500,
-    )
+)
 request = build_http_request(
     "post",
     "https://api.example.com/data",
@@ -202,8 +201,7 @@ def configure_logger(
     filters,
     encoding,
     rotation_size_mb,
-    
-):
+    ):
     import logging
 
     logger = logging.getLogger(name)
@@ -236,8 +234,7 @@ def build_http_request(
     timeout,
     verify_ssl,
     **extra_options,
-    
-):
+    ):
     request = {
         "method": method.upper(),
         "url": url,
@@ -265,15 +262,14 @@ def nested_transform(
     if isinstance(data, dict):
         return {
             key_fn(k): nested_transform(
-            value_fn(v),
-            transform_fn,
-            filter_fn,
-            key_fn,
-            value_fn,
-            depth - 1,
-            strict,
-            coerce,
-            
+                value_fn(v),
+                transform_fn,
+                filter_fn,
+                key_fn,
+                value_fn,
+                depth - 1,
+                strict,
+                coerce,
             )
             for k, v in data.items()
             if filter_fn(k, v)
@@ -281,15 +277,14 @@ def nested_transform(
     if isinstance(data, list):
         return [
             nested_transform(
-            item,
-            transform_fn,
-            filter_fn,
-            key_fn,
-            value_fn,
-            depth - 1,
-            strict,
-            coerce,
-            
+                item,
+                transform_fn,
+                filter_fn,
+                key_fn,
+                value_fn,
+                depth - 1,
+                strict,
+                coerce,
             )
             for item in data
             if filter_fn(None, item)

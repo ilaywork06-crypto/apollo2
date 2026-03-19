@@ -81,7 +81,11 @@ def compute_stats(values):
 
     sorted_vals = sorted(values)
 
-    median = sorted_vals[n // 2] if n % 2 else (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2
+    median = (
+        sorted_vals[n // 2]
+        if n % 2
+        else (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2
+    )
 
     return {
         "count": n,
@@ -100,13 +104,13 @@ def to_snake_case(text):
         r"([A-Z]+)([A-Z][a-z])",
         r"\1_\2",
         text,
-        )
+    )
 
     text = re.sub(
         r"([a-z\d])([A-Z])",
         r"\1_\2",
         text,
-        )
+    )
 
     return text.lower()
 

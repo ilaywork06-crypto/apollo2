@@ -41,7 +41,8 @@ class ServiceClient:
         import os
 
         return ServiceClient(
-            os.getenv("SERVICE_URL", "http://localhost:8000"), os.getenv("SERVICE_TOKEN", "")
+            os.getenv("SERVICE_URL", "http://localhost:8000"),
+            os.getenv("SERVICE_TOKEN", ""),
         )
 
     @retry(max_attempts=3, delay_seconds=0.5)
@@ -135,7 +136,12 @@ def process_invoice(
     amount,
     currency,
     ):
-    return {"id": invoice_id, "amount": amount, "currency": currency, "status": "processed"}
+    return {
+        "id": invoice_id,
+        "amount": amount,
+        "currency": currency,
+        "status": "processed",
+    }
 
 
 @require_auth
@@ -157,12 +163,14 @@ def send_webhook(
     payload,
     secret,
     ):
-    import json, hmac, hashlib
+    import json
+    import hmac
+    import hashlib
 
     body = json.dumps(payload).encode()
     sig = hmac.new(
         secret.encode(),
         body,
         hashlib.sha256,
-        ).hexdigest()
+    ).hexdigest()
     return {"endpoint": endpoint, "signature": sig, "delivered": True}

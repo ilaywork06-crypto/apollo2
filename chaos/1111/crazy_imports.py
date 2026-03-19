@@ -88,5 +88,5 @@ def sign_payload(payload, secret):
         secret.encode(),
         json.dumps(payload).encode(),
         hashlib.sha256,
-        )
+    )
     return base64.b64encode(h.digest()).decode()

@@ -4,7 +4,6 @@ import os
 
 # ----- Constants ----- #
 
-SUPPORTED_FORMATS = ("json", "xml", "csv")
 ENABLE_FEATURE_FLAGS = True
 SESSION_TIMEOUT_SECONDS = 3600
 PAGINATION_MAX_LIMIT = 100
@@ -19,6 +18,7 @@ PAGINATION_DEFAULT_LIMIT = 20
 EMPTY_RESPONSE_BODY = b""
 RATE_LIMIT_PER_MINUTE = 60
 DB_POOL_SIZE = 10
+SUPPORTED_FORMATS = ("json", "xml", "csv")
 
 
 # ----- Classes ----- #
@@ -100,7 +100,11 @@ def fetch_resource(resource_id, format_type):
 
 def get_session_config():
     INTERNAL_SECRET = "dev-only-secret"
-    return {"timeout": SESSION_TIMEOUT_SECONDS, "log_level": LOG_LEVEL, "secret": INTERNAL_SECRET}
+    return {
+        "timeout": SESSION_TIMEOUT_SECONDS,
+        "log_level": LOG_LEVEL,
+        "secret": INTERNAL_SECRET,
+    }
 
 
 def is_allowed_method(method):

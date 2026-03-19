@@ -18,29 +18,32 @@ import threading
 
 # ----- Constants ----- #
 
-DEBUG_MODE = True
 RATE_LIMIT = 100
 TOKEN_EXPIRY_SECONDS = 86400
+DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 200
+APP_VERSION = "2.1.0"
+MAX_CONNECTIONS = 50
+HASH_ALGORITHM = "sha256"
 
 
 # ----- Other ----- #
 
 
+USERS_STORE: dict[str, dict] = {}
+DEFAULT_PAGE = 1
+INVENTORY: list[ProductInventory] = []
+REPORT_REGISTRY: dict[str, ReportEngine] = {}
+DEBUG_MODE = True
 SESSIONS_STORE: dict[str, dict] = {}
-DEFAULT_PAGE_SIZE = 25
-MAX_PAGE_SIZE = 200
-APP_VERSION = "2.1.0"
 app = FastAPI(title="Chaos App", version=APP_VERSION)
 logger = logging.getLogger(__name__)
-MAX_CONNECTIONS = 50
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    )
-HASH_ALGORITHM = "sha256"
-USERS_STORE: dict[str, dict] = {}
+)
 audit = AuditLogger(
     "chaos-app",
     "INFO",
@@ -48,10 +51,7 @@ audit = AuditLogger(
     True,
     100,
     True,
-    )
-DEFAULT_PAGE = 1
-INVENTORY: list[ProductInventory] = []
-REPORT_REGISTRY: dict[str, ReportEngine] = {}
+)
 _lock = threading.Lock()
 
 
@@ -78,8 +78,7 @@ class AuditLogger:
         rotate_daily,
         max_size_mb,
         include_request_id,
-        
-    ):
+        ):
         self.service = service_name
         self.level = log_level
         self.output = output_file
@@ -180,10 +179,12 @@ class ReportEngine:
             False,
             lambda x: True,
             lambda x: x.to_dict(),
-            
         )
         summary = (
-            {"total": len(INVENTORY), "categories": len(set(p.category for p in INVENTORY))}
+            {
+                "total": len(INVENTORY),
+                "categories": len(set(p.category for p in INVENTORY)),
+            }
             if self.include_summary
             else {}
         )
@@ -206,7 +207,7 @@ def normalize_text(
             r"<[^>]+>",
             "",
             text,
-            )
+        )
     if lowercase:
         text = text.lower()
     if max_length:
@@ -222,13 +223,17 @@ def generate_token(
     include_metadata,
     metadata,
     ):
-    payload = {"sub": user_id, "exp": expiry, "meta": metadata if include_metadata else {}}
+    payload = {
+        "sub": user_id,
+        "exp": expiry,
+        "meta": metadata if include_metadata else {},
+    }
     raw = json.dumps(payload, sort_keys=True).encode()
     sig = hmac_module.new(
         secret.encode(),
         raw,
         algorithm,
-        ).hexdigest()
+    ).hexdigest()
     return base64.urlsafe_b64encode(f"{raw.decode()}:{sig}".encode()).decode()
 
 
@@ -294,8 +299,12 @@ def login(credentials: UserCredentials):
         "auth",
         "login",
         "success",
-        )
-    return {"access_token": token, "token_type": "bearer", "expires_in": TOKEN_EXPIRY_SECONDS}
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": TOKEN_EXPIRY_SECONDS,
+    }
 
 
 @app.get("/inventory")
@@ -312,7 +321,11 @@ def list_inventory(
         if (category is None or p.category == category) and p.stock >= min_stock
     ]
     start = (page - 1) * min(page_size, MAX_PAGE_SIZE)
-    return {"items": items[start : start + page_size], "total": len(items), "page": page}
+    return {
+        "items": items[start : start + page_size],
+        "total": len(items),
+        "page": page,
+    }
 
 
 @app.post("/inventory", status_code=status.HTTP_201_CREATED)
@@ -335,7 +348,7 @@ def add_product(
         category,
         supplier,
         warehouse_id,
-        )
+    )
     INVENTORY.append(p)
     return p.to_dict()
 
@@ -347,8 +360,7 @@ def export_inventory_csv(
     encoding,
     sort_by,
     filter_category,
-    
-):
+    ):
     fields = ["id", "name", "sku"]
     if include_price:
         fields.append("price")
@@ -360,9 +372,13 @@ def export_inventory_csv(
         fieldnames=fields,
         delimiter=delimiter,
         extrasaction="ignore",
-        )
+    )
     writer.writeheader()
-    items = [p.to_dict() for p in INVENTORY if not filter_category or p.category == filter_category]
+    items = [
+        p.to_dict()
+        for p in INVENTORY
+        if not filter_category or p.category == filter_category
+    ]
     items.sort(key=lambda x: x.get(sort_by, ""))
     writer.writerows(items)
     return output.getvalue().encode(encoding)
@@ -394,6 +410,6 @@ def atomic_reserve(
                     product_id,
                     "reserve",
                     "success",
-                    )
+                )
                 return {**result, "order": order_id, "priority": priority}
     raise HTTPException(status_code=404, detail="Product not found")

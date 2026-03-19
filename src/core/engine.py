@@ -3,18 +3,18 @@
 import copy
 from pathlib import Path
 
+from src.core import risk_classifier
+from src.parsers.fund_parser import parse_xml_file
 from src.parsers.mislaka_parser import parse_multible_mislaka_files
-from src.parsers.parser import parse_xml_file
-from src.parsers.risk_level_generator import get_stocks_percentage_by_kupa_id
 
 # ----- Constants ----- #
 
-_ENGINE_DIR = Path(__file__).parent
-GEMEL_NET_PATH = _ENGINE_DIR / "kupot_gemel_net.xml"
-RISKS_MAP_PATH = _ENGINE_DIR / "risks_map.xml"
+_DATA_DIR = Path(__file__).parent.parent.parent / "data"
+GEMEL_NET_PATH = _DATA_DIR / "kupot_gemel_net.xml"
+RISKS_MAP_PATH = _DATA_DIR / "risks_map.xml"
 
 # Parse static data once at startup
-get_stocks_percentage_by_kupa_id(RISKS_MAP_PATH)
+risk_classifier.load(RISKS_MAP_PATH)
 _KUPOT_LIST = parse_xml_file(GEMEL_NET_PATH)
 
 # ----- Functions ----- #

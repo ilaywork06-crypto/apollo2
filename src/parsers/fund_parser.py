@@ -2,8 +2,8 @@
 
 import xml.etree.ElementTree as ET
 
-from src.parsers.risk_level_generator import get_risk_level
-from src.parsers.utils import extract_data_from_xml
+from src.core.risk_classifier import get_risk_level
+from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
 
