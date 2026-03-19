@@ -489,7 +489,6 @@ function FundResults({ data, weights }) {
 
   const pct = client.percentile ?? 0;
   const isBelow = !isNew && pct < 50;
-  const isAbove = !isNew && pct >= 50;
 
   // Bar chart: proportional to actual tsua_1 values
   const clientTsua1 = client.tsua_1 ?? 0;
