@@ -8,5 +8,6 @@ dependencies = [
     "fastapi>=0.135.1",
     "lxml>=6.0.2",
     "python-multipart>=0.0.22",
+    "ruff>=0.15.7",
     "uvicorn>=0.42.0",
 ]
