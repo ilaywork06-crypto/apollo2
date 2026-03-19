@@ -149,30 +149,27 @@ function Header({ onReset }) {
         )}
         <div className="header-brand">
           <div className="header-logo">
-            <svg width="46" height="46" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="34" height="42" viewBox="-3 -3 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#60A5FA"/>
-                  <stop offset="100%" stopColor="#A78BFA"/>
-                </linearGradient>
-                <linearGradient id="eyeGrad" x1="4" y1="16" x2="28" y2="16" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#fff" stopOpacity="0.15"/>
-                  <stop offset="100%" stopColor="#fff" stopOpacity="0.05"/>
+                <linearGradient id="hg" x1="15" y1="0" x2="15" y2="38" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#A78BFA"/>
+                  <stop offset="100%" stopColor="#3B82F6"/>
                 </linearGradient>
               </defs>
-              {/* Eye shape */}
-              <path d="M4 16 C8 9, 24 9, 28 16 C24 23, 8 23, 4 16 Z" fill="url(#eyeGrad)" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-              {/* Pupil */}
-              <circle cx="16" cy="16" r="4.5" fill="url(#logoGrad)" opacity="0.9"/>
-              <circle cx="16" cy="16" r="2" fill="white" opacity="0.95"/>
-              {/* Chart line inside eye */}
-              <polyline points="7,18 10,15 13,17 16,13 19,15 22,11 25,13" stroke="url(#logoGrad)" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              {/* Top dot on chart */}
-              <circle cx="22" cy="11" r="1.3" fill="#A78BFA"/>
+              {/* Left leg */}
+              <line x1="15" y1="2" x2="1" y2="34" stroke="url(#hg)" strokeWidth="4" strokeLinecap="round"/>
+              {/* Right leg */}
+              <line x1="15" y1="2" x2="29" y2="34" stroke="url(#hg)" strokeWidth="4" strokeLinecap="round"/>
+              {/* Crossbar */}
+              <line x1="7" y1="21" x2="23" y2="21" stroke="url(#hg)" strokeWidth="3.5" strokeLinecap="round"/>
+              {/* Peak accent dot */}
+              <circle cx="15" cy="2" r="4" fill="#A78BFA"/>
             </svg>
           </div>
           <div className="header-text">
-            <span className="header-title">AmoSight</span>
+            <span className="header-title">
+              <span className="header-title-amo">Amo</span><span className="header-title-sight">Sight</span>
+            </span>
             <span className="header-subtitle">ניתוח והשוואת קופות גמל</span>
           </div>
         </div>
@@ -361,61 +358,104 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
 function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, onAnalyze }) {
   const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
   const ready = mislakaFiles.length > 0 && sum === 100;
+  const hasFiles = mislakaFiles.length > 0;
+  const isDefaultWeights = weights.w1 === DEFAULT_WEIGHTS.w1 && weights.w3 === DEFAULT_WEIGHTS.w3 && weights.w5 === DEFAULT_WEIGHTS.w5 && weights.wSharp === DEFAULT_WEIGHTS.wSharp;
+
+  const sumOk = sum === 100;
 
   return (
     <div className="screen screen--upload">
       <Stars />
       <Header />
       <div className="upload-content">
+
+        {/* ── Hero ── */}
         <div className="hero">
-          <h1 className="hero-title">בדוק את הביצועים של הקופה שלך</h1>
+          <div className="hero-badge">✦ AmoSight · ניתוח קופות גמל חכם</div>
+          <h1 className="hero-title">בדוק את הביצועים<br/>של הקופה שלך</h1>
           <p className="hero-sub">
-            העלה את קבצי ה-XML מהמסלקה הפנסיונית וקבל ניתוח מקיף של ביצועי הקופה שלך מול השוק
+            העלה קבצי XML מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופה שלך עומדת מול שוק הגמל
           </p>
         </div>
 
-        <div className="upload-row">
-          <MultiUploadZone
-            files={mislakaFiles}
-            onFiles={onMislakaFiles}
-            onRemoveFile={onRemoveMislakaFile}
-            onViewFile={onViewFile}
-          />
-        </div>
-
-        <WeightsForm weights={weights} onChange={onWeightsChange} />
-
-<div className="info-cards">
-          <div className="info-card">
-            <div className="info-icon">📊</div>
-            <div className="info-body">
-              <div className="info-title">השוואה מול השוק</div>
-              <div className="info-desc">דירוג הקופה שלך מול כל הקופות באותה רמת סיכון</div>
+        {/* ── Feature strip ── */}
+        <div className="feature-strip">
+          <div className="feature-item">
+            <div className="feature-icon" style={{background:'rgba(59,130,246,0.15)',border:'1px solid rgba(59,130,246,0.3)'}}>📊</div>
+            <div className="feature-text">
+              <div className="feature-title">השוואה מול השוק</div>
+              <div className="feature-desc">דירוג מול כל הקופות ברמת הסיכון שלך</div>
             </div>
           </div>
-          <div className="info-card">
-            <div className="info-icon">🏆</div>
-            <div className="info-body">
-              <div className="info-title">3 החלופות הטובות ביותר</div>
-              <div className="info-desc">הצגת 3 קופות עם AmoScore גבוה יותר</div>
+          <div className="feature-divider" />
+          <div className="feature-item">
+            <div className="feature-icon" style={{background:'rgba(16,185,129,0.15)',border:'1px solid rgba(16,185,129,0.3)'}}>🏆</div>
+            <div className="feature-text">
+              <div className="feature-title">3 החלופות הטובות</div>
+              <div className="feature-desc">קופות עם AmoScore גבוה יותר</div>
             </div>
           </div>
-          <div className="info-card">
-            <div className="info-icon">⚡</div>
-            <div className="info-body">
-              <div className="info-title">מה החמצת?</div>
-              <div className="info-desc">כמה כסף יכולת לחסוך אם היית עובר קופה</div>
+          <div className="feature-divider" />
+          <div className="feature-item">
+            <div className="feature-icon" style={{background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.3)'}}>💎</div>
+            <div className="feature-text">
+              <div className="feature-title">מה החמצת?</div>
+              <div className="feature-desc">הפוטנציאל שאבדת ואיך לשחזר אותו</div>
             </div>
           </div>
         </div>
 
-        <button
-          className={`btn-analyze${ready ? ' btn-analyze--active' : ''}`}
-          disabled={!ready}
-          onClick={onAnalyze}
-        >
-          🔍 הפעל ניתוח
-        </button>
+        {/* ── Step 1: Upload ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header">
+            <div className="step-card-num">01</div>
+            <div className="step-card-label">העלאת קבצי מסלקה</div>
+            {hasFiles && (
+              <button className="quick-action-btn quick-action-btn--clear" onClick={() => onMislakaFiles([])}>
+                🗑 נקה הכל
+              </button>
+            )}
+          </div>
+          <div className="upload-row">
+            <MultiUploadZone
+              files={mislakaFiles}
+              onFiles={onMislakaFiles}
+              onRemoveFile={onRemoveMislakaFile}
+              onViewFile={onViewFile}
+            />
+          </div>
+        </div>
+
+        {/* ── Step 2: Weights ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header">
+            <div className="step-card-num">02</div>
+            <div className="step-card-label">כיוון משקלות AmoScore</div>
+            {!isDefaultWeights && (
+              <button className="quick-action-btn quick-action-btn--reset" onClick={() => onWeightsChange(DEFAULT_WEIGHTS)}>
+                ↺ איפוס
+              </button>
+            )}
+          </div>
+          <WeightsForm weights={weights} onChange={onWeightsChange} />
+        </div>
+
+        {/* ── Analyze ── */}
+        <div className="analyze-wrap">
+          <button
+            className={`btn-analyze${ready ? ' btn-analyze--active' : ''}`}
+            disabled={!ready}
+            onClick={onAnalyze}
+          >
+            {ready ? '🔍 הפעל ניתוח' : '🔍 הפעל ניתוח'}
+          </button>
+          <div className="analyze-status">
+            {!hasFiles && <span className="analyze-status-item">· העלה לפחות קובץ אחד</span>}
+            {hasFiles && !sumOk && <span className="analyze-status-item">· המשקלות צריכים להסתכם ל-100% (כרגע {sum}%)</span>}
+            {ready && <span className="analyze-status-item analyze-status-ready">· מוכן לניתוח</span>}
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -444,12 +484,11 @@ function LoadingScreen({ step, progress }) {
 // ─── Fund Results Section ─────────────────────────────────────────────────────
 
 function FundResults({ data, weights }) {
-  const { client, alternatives } = data;
+  const { client, alternatives, golden: gold } = data;
   const isNew = client.grade === 0;
 
   const pct = client.percentile ?? 0;
   const isBelow = !isNew && pct < 50;
-  const isAbove = !isNew && pct >= 50;
 
   // Bar chart: proportional to actual tsua_1 values
   const clientTsua1 = client.tsua_1 ?? 0;
@@ -487,133 +526,106 @@ function FundResults({ data, weights }) {
     return color;
   });
 
+  const medals = ['🥇', '🥈', '🥉'];
+
   return (
     <div className="fund-results fade-in fund-section">
 
       {/* 1 ─ Client Header Card */}
       <div className="client-card">
+        <div className="client-card-accent" style={{ background: riskColor }} />
         <div className="client-card-info">
-          <div className="client-card-badge">פרטי הקופה</div>
+          <div className="client-card-pills">
+            <span className="risk-pill" style={{ background: `${riskColor}22`, color: riskColor, borderColor: `${riskColor}55` }}>
+              ● רמת סיכון {riskLabel}
+            </span>
+            {!isNew && client.rank != null && (
+              <span className={`rank-pill ${clientIsTop ? 'rank-pill--good' : 'rank-pill--bad'}`}>
+                מקום {client.rank} מתוך {client.total_in_risk}
+              </span>
+            )}
+          </div>
           <div className="client-fund-name">{client.name}</div>
           <div className="client-fund-meta">
             קופה #{client.id}
             {client.hevra && <> · {client.hevra}</>}
             {client.seniority_date && <> · ותק מ-{formatDate(client.seniority_date)}</>}
-            {client.total_in_risk != null && (
-              <> · מקום {client.rank} מתוך {client.total_in_risk} קופות</>
-            )}
-            {client.risk_level && (
-              <> · רמת סיכון: <strong style={{ color: riskColor }}>{riskLabel}</strong></>
-            )}
+          </div>
+          <div className="client-stats-inline">
+            <div className="client-stat-item">
+              <div className="client-stat-label">צבירה</div>
+              <div className="client-stat-val">₪{fmt(client.amount)}</div>
+            </div>
+            <div className="client-stat-sep" />
+            <div className="client-stat-item">
+              <div className="client-stat-label">תשואה שנה</div>
+              <div className="client-stat-val client-stat-val--amber">
+                {client.tsua_1 ? `${fmtDec(client.tsua_1)}%` : 'N/A'}
+              </div>
+            </div>
+            <div className="client-stat-sep" />
+            <div className="client-stat-item">
+              <div className="client-stat-label">תשואה 3 שנים</div>
+              <div className="client-stat-val">
+                {isNew || !client.tsua_3 ? 'N/A' : `${fmtDec(client.tsua_3)}%`}
+              </div>
+            </div>
+            <div className="client-stat-sep" />
+            <div className="client-stat-item">
+              <div className="client-stat-label">דמי ניהול</div>
+              <div className="client-stat-val">
+                {client.dmei_nihul != null ? `${fmtDec(client.dmei_nihul, 2)}%` : '—'}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="gauge-container">
+        <div className="client-score-wrap">
           <div className="gauge-amoscore-label">AmoScore</div>
-          <div className="gauge-amoscore-value">{isNew || !client.grade ? '–' : fmtDec(client.grade)}</div>
-          <GaugeChart
-            percentile={pct}
-            rank={client.rank}
-            total={client.total_in_risk}
-          />
-        </div>
-      </div>
-
-      {/* 2 ─ Stats Row */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-label">סכום צבירה</div>
-          <div className="stat-value">₪{fmt(client.amount)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">תשואה שנתית ממוצעת</div>
-          <div className="stat-value stat-value--amber">
-            {client.tsua_1 ? `${fmtDec(client.tsua_1)}%` : 'N/A'}
+          <div className="gauge-amoscore-value" style={{ color: isNew ? '#64748B' : '#F8FAFC' }}>
+            {isNew || !client.grade ? '–' : fmtDec(client.grade)}
           </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">תשואה שנתית ממוצעת 3 שנים</div>
-          <div className="stat-value">
-            {isNew || !client.tsua_3 ? 'N/A' : `${fmtDec(client.tsua_3)}%`}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">דמי ניהול </div>
-          <div className="stat-value">
-            {client.dmei_nihul != null ? `${fmtDec(client.dmei_nihul)}%` : '—'}
+          <GaugeChart percentile={pct} rank={client.rank} total={client.total_in_risk} />
+          <div className={`client-verdict ${isNew ? 'verdict--new' : isBelow ? 'verdict--bad' : 'verdict--good'}`}>
+            {isNew ? 'קופה חדשה — מעט נתונים' : isBelow ? '⚠ מתחת לממוצע' : '✓ מעל הממוצע'}
           </div>
         </div>
       </div>
 
-      {/* 3 ─ Rating Banner */}
-      {isNew && (
-        <div className="rating-banner rating-banner--blue">
-          <span className="rating-banner-icon">ℹ️</span>
-          <div>
-            <div className="rating-banner-title">הקופה שלך חדשה — אין מספיק נתונים לדירוג מלא</div>
-            <div className="rating-banner-sub">
-              {client.total_in_risk != null && <>קופה מקום {client.rank} מתוך {client.total_in_risk} קופות · </>}
-              הנתונים יתעדכנו עם הצטברות תשואות
-            </div>
-          </div>
-        </div>
-      )}
-      {isBelow && (
-        <div className="rating-banner rating-banner--red">
-          <span className="rating-banner-icon">⚠️</span>
-          <div>
-            <div className="rating-banner-title">הקופה שלך מדורגת מתחת לממוצע</div>
-            <div className="rating-banner-sub">
-              מקום {client.rank} מתוך {client.total_in_risk} — {pct}% מהקופות מציגות תשואה נמוכה יותר
-            </div>
-          </div>
-        </div>
-      )}
-      {isAbove && (
-        <div className="rating-banner rating-banner--green">
-          <span className="rating-banner-icon">✅</span>
-          <div>
-            <div className="rating-banner-title">הקופה שלך מדורגת מעל לממוצע</div>
-            <div className="rating-banner-sub">
-              מקום {client.rank} מתוך {client.total_in_risk} — ביצועים טובים ממרבית הקופות
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4 ─ Bar Chart */}
+      {/* 2 ─ Bar Chart */}
       <div className="chart-card">
         <div className="chart-header">
-          <div className="chart-title">השוואת תשואות שנתיות ברוטו (בניכוי ד"נ)</div>
-          <div className="chart-sub">השוואה מול {client.total_in_risk ?? '–'} קופות באותה רמת סיכון</div>
+          <div>
+            <div className="chart-title">תשואה שנתית — השוואה לשוק</div>
+            <div className="chart-sub">{client.total_in_risk ?? '–'} קופות ברמת סיכון {riskLabel}</div>
+          </div>
         </div>
         <div className="chart-bars">
-          {/* Client bar */}
-          <div className="bar-row">
-            <div className="bar-label">{shortName(client.name)}</div>
-            <div className="bar-track">
+          <div className="bar-row bar-row--client">
+            <div className="bar-label bar-label--client">
+              {shortName(client.name)}
+              <span className="bar-client-tag">הקופה שלך</span>
+            </div>
+            <div className="bar-track bar-track--client">
               <div
                 className={`bar-fill ${clientIsTop ? 'bar-fill--client' : 'bar-fill--red'}`}
                 style={{ width: clientTsua1 > 0 ? `${(clientTsua1 / maxTsua) * 100}%` : '5%' }}
               >
-                <span className="bar-pct">
-                  {clientTsua1 > 0 ? `${fmtDec(clientTsua1)}%` : '—'}
-                </span>
+                <span className="bar-pct">{clientTsua1 > 0 ? `${fmtDec(clientTsua1)}%` : '—'}</span>
               </div>
             </div>
           </div>
-          {/* Alternative bars */}
           {alternatives.map((alt, i) => {
             const tsua = alt.tsua_1 ?? 0;
             return (
               <div key={alt.id} className="bar-row">
-                <div className="bar-label">{shortName(alt.name)}</div>
+                <div className="bar-label">
+                  <span style={{ marginLeft: '4px' }}>{medals[i] ?? ''}</span>
+                  {shortName(alt.name)}
+                </div>
                 <div className="bar-track">
                   <div
                     className="bar-fill"
-                    style={{
-                      width: `${Math.max((tsua / maxTsua) * 100, 2)}%`,
-                      background: ALT_GRADIENTS[i] || ALT_COLORS[i],
-                    }}
+                    style={{ width: `${Math.max((tsua / maxTsua) * 100, 2)}%`, background: ALT_GRADIENTS[i] || ALT_COLORS[i] }}
                   >
                     <span className="bar-pct">{fmtDec(tsua)}%</span>
                   </div>
@@ -624,18 +636,23 @@ function FundResults({ data, weights }) {
         </div>
       </div>
 
-      {/* 5 ─ Alternatives Table — sorted by AmoScore */}
+      {/* 3 ─ Leaderboard Table */}
       <div className="table-card">
-        <div className="table-title">🏆 השוואת קופות לפי AmoScore</div>
+        <div className="table-header-row">
+          <div>
+            <div className="table-title">טבלת דירוג — AmoScore</div>
+            <div className="table-title-sub">ממוינות לפי ציון מנורמל, כולל ניכוי דמי ניהול</div>
+          </div>
+        </div>
         <div className="table-wrap">
           <table className="alts-table">
             <thead>
               <tr>
-                <th>דירוג</th>
+                <th>#</th>
                 <th>שם הקופה</th>
                 <th>תשואה שנתית</th>
                 <th>AmoScore</th>
-                <th>סכום פוטנציאלי *</th>
+                <th>פוטנציאל *</th>
                 <th>הפרש</th>
               </tr>
             </thead>
@@ -643,18 +660,14 @@ function FundResults({ data, weights }) {
               {sortedFunds.map((fund, idx) => {
                 const color = fundColors[idx];
                 const diffNeg = fund.diff != null && fund.diff < 0;
+                const medal = !fund.isClient && idx < 3 ? medals[idx] : null;
                 return (
                   <tr key={fund.id} className={fund.isClient ? (clientIsTop ? 'row-client' : 'row-client row-client--bad') : 'row-alt'}>
                     <td>
-                      <span
-                        className="rank-badge"
-                        style={{
-                          background: `${color}33`,
-                          color: color,
-                        }}
-                      >
-                        {fund.isClient ? (fund.rank ?? '–') : idx + 1}
-                      </span>
+                      {medal
+                        ? <span className="medal-badge">{medal}</span>
+                        : <span className="rank-badge" style={{ background: `${color}33`, color }}>{fund.isClient ? (fund.rank ?? '–') : idx + 1}</span>
+                      }
                     </td>
                     <td className="td-name">
                       <div>{fund.name}</div>
@@ -664,25 +677,13 @@ function FundResults({ data, weights }) {
                         <div className={`td-name-tag ${clientIsTop ? 'td-name-tag--client' : 'td-name-tag--client-bad'}`}>הקופה שלך</div>
                       )}
                     </td>
-                    <td className="td-return" style={{ color }}>
-                      {fund.tsua_1 != null ? `${fmtDec(fund.tsua_1)}%` : 'N/A'}
-                    </td>
-                    <td className="td-score">
-                      {fund.grade ? fmtDec(fund.grade) : '–'}
-                    </td>
-                    <td className="td-potential">
-                      {fund.potential_amount != null ? `₪${fmt(fund.potential_amount)}` : '—'}
-                    </td>
+                    <td className="td-return" style={{ color }}>{fund.tsua_1 != null ? `${fmtDec(fund.tsua_1)}%` : 'N/A'}</td>
+                    <td className="td-score">{fund.grade ? fmtDec(fund.grade) : '–'}</td>
+                    <td className="td-potential">{fund.potential_amount != null ? `₪${fmt(fund.potential_amount)}` : '—'}</td>
                     <td className="td-diff">
                       {fund.diff != null ? (
                         <div>
-                          <span
-                            className="diff-badge"
-                            style={{
-                              background: diffNeg ? 'rgba(239,68,68,0.15)' : undefined,
-                              color: diffNeg ? '#EF4444' : undefined,
-                            }}
-                          >
+                          <span className="diff-badge" style={{ background: diffNeg ? 'rgba(239,68,68,0.15)' : undefined, color: diffNeg ? '#EF4444' : undefined }}>
                             {diffNeg ? '' : '+'}₪{fmt(Math.abs(fund.diff))}
                           </span>
                           {fund.diff_percent != null && (
@@ -699,61 +700,89 @@ function FundResults({ data, weights }) {
             </tbody>
           </table>
         </div>
-        <div className="table-footnote">
-          * לא נוכו דמי ניהול חיצוניים מהחישוב
-        </div>
-        <div className="risk-note">
-          רמת הסיכון נקבעת על פי רמת החשיפה למניות בחודש האחרון
-        </div>
+        <div className="table-footnote">* לא נוכו דמי ניהול חיצוניים מהחישוב · רמת הסיכון נקבעת לפי חשיפה למניות בחודש האחרון</div>
       </div>
 
-      {/* 6 ─ High-risk option box */}
-      {bestAlt && diffPct > 0 && (
-        <div className="highrisk-card">
-          <div className="highrisk-icon">⚡</div>
-          <div className="highrisk-body">
-            <div className="highrisk-title">מה החמצת?</div>
-            <div className="highrisk-desc">
-              עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-
-              <strong className="highrisk-pct"> {fmtDec(diffPct)}%</strong>
-            </div>
-            <div className="highrisk-amounts">
-              <div className="highrisk-amount-item">
-                <div className="highrisk-amount-label">היום</div>
-                <div className="highrisk-amount-val">₪{fmt(client.amount)}</div>
-                {client.tsua_1 ? (
-                  <div className="highrisk-amount-sub">{fmtDec(client.tsua_1)}% תשואה</div>
-                ) : null}
+      {/* 6 ─ High-risk option box + Gold card */}
+      <div className="bottom-cards-row">
+        {bestAlt && client.rank !== 1 && (bestAlt.potential_amount > client.amount) && (
+          <div className="highrisk-card">
+            <div className="highrisk-icon">⚡</div>
+            <div className="highrisk-body">
+              <div className="highrisk-title">מה החמצת?</div>
+              <div className="highrisk-desc">
+                עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-
+                <strong className="highrisk-pct"> {fmtDec(diffPct)}%</strong>
               </div>
-              <div className="highrisk-arrow">←</div>
-              <div className="highrisk-amount-item">
-                <div className="highrisk-amount-label">פוטנציאל</div>
-                <div className="highrisk-amount-val highrisk-amount-val--green">
-                  {bestAlt.potential_amount != null ? `₪${fmt(bestAlt.potential_amount)}` : '—'}
+              <div className="highrisk-amounts">
+                <div className="highrisk-amount-item">
+                  <div className="highrisk-amount-label">היום</div>
+                  <div className="highrisk-amount-val">₪{fmt(client.amount)}</div>
+                  {client.tsua_1 ? (
+                    <div className="highrisk-amount-sub">{fmtDec(client.tsua_1)}% תשואה</div>
+                  ) : null}
                 </div>
-                {bestAlt.tsua_1 ? (
-                  <div className="highrisk-amount-sub">{fmtDec(bestAlt.tsua_1)}% תשואה</div>
-                ) : null}
+                <div className="highrisk-arrow">←</div>
+                <div className="highrisk-amount-item">
+                  <div className="highrisk-amount-label">פוטנציאל</div>
+                  <div className="highrisk-amount-val highrisk-amount-val--green">
+                    {bestAlt.potential_amount != null ? `₪${fmt(bestAlt.potential_amount)}` : '—'}
+                  </div>
+                  {bestAlt.tsua_1 ? (
+                    <div className="highrisk-amount-sub">{fmtDec(bestAlt.tsua_1)}% תשואה</div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {gold && gold.potential_amount != null && gold.potential_amount > client.amount && (
+          <div className="gold-card">
+            <div className="gold-icon">🏆</div>
+            <div className="gold-body">
+              <div className="gold-title">תפוח הזהב</div>
+              <div className="gold-subtitle">מקום #1 ברמת סיכון גבוה</div>
+              <div className="gold-desc">
+                אם היית עובר לקופה המובילה בסיכון הגבוה ביותר, הצבירה שלך הייתה גדלה ב-
+                <strong> {fmtDec(gold.diff_percent)}%</strong>
+              </div>
+              <div className="gold-amounts">
+                <div className="gold-amount-item">
+                  <div className="gold-amount-label">היום</div>
+                  <div className="gold-amount-val">₪{fmt(client.amount)}</div>
+                </div>
+                <div className="gold-arrow">←</div>
+                <div className="gold-amount-item">
+                  <div className="gold-amount-label">פוטנציאל</div>
+                  <div className="gold-amount-val gold-amount-val--gold">₪{fmt(gold.potential_amount)}</div>
+                  {gold.tsua_1 && <div className="gold-amount-sub">{fmtDec(gold.tsua_1)}% תשואה</div>}
+                </div>
+              </div>
+              {gold.name && <div className="gold-fund-name">קופה: {gold.name}{gold.id && <span className="gold-fund-id"> · #{gold.id}</span>}</div>}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 7 ─ AmoScore Explanation */}
       <div className="amoscore-explanation">
-        <div className="amoscore-explanation-title">כיצד מחושב AmoScore?</div>
+        <div className="amoscore-explanation-header">
+          <span className="amoscore-explanation-icon">📐</span>
+          <div className="amoscore-explanation-title">כיצד מחושב AmoScore?</div>
+        </div>
         <div className="amoscore-explanation-body">
           <p>AmoScore מחושב על בסיס 4 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, ו-Sharp Ratio.</p>
           <p>כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה. לאחר מכן כל פרמטר מוכפל במשקל שנבחר, והציון הסופי הוא הסכום המשוקלל של כל הפרמטרים.</p>
           {weights && (
-            <p className="amoscore-weights-used">
-              החישוב בוצע עם המשקלות הבאים:
-              תשואה שנה {weights.w1}% ·
-              תשואה 3 שנים {weights.w3}% ·
-              תשואה 5 שנים {weights.w5}% ·
-              Sharp Ratio {weights.wSharp}%
-            </p>
+            <div className="amoscore-weights-chips">
+              {[['תשואה שנה', weights.w1], ['תשואה 3 שנים', weights.w3], ['תשואה 5 שנים', weights.w5], ['Sharp Ratio', weights.wSharp]].map(([label, val]) => (
+                <div key={label} className="weight-chip">
+                  <div className="weight-chip-label">{label}</div>
+                  <div className="weight-chip-val">{val}%</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -775,26 +804,6 @@ const PDF_DARK   = '#0F172A';
 const PDF_TEXT   = '#1E293B';
 const PDF_MUTED  = '#64748B';
 
-async function captureElement(html) {
-  const el = document.createElement('div');
-  el.style.cssText = `
-    position: absolute; top: 0; left: -9999px;
-    width: 794px; background: #ffffff;
-    direction: rtl; font-family: Arial, Helvetica, sans-serif;
-    color: ${PDF_TEXT}; padding: 40px 48px; box-sizing: border-box;
-  `;
-  el.innerHTML = html;
-  document.body.appendChild(el);
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  try {
-    return await html2canvas(el, {
-      scale: 2, backgroundColor: '#ffffff',
-      useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 794,
-    });
-  } finally {
-    document.body.removeChild(el);
-  }
-}
 
 function pdfHeader(today) {
   return `
@@ -802,23 +811,21 @@ function pdfHeader(today) {
       margin-bottom:24px;padding-bottom:16px;
       border-bottom:2px solid ${PDF_BLUE};">
       <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:46px;height:46px;border-radius:12px;
-          background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});
-          display:flex;align-items:center;justify-content:center;">
-          <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
-            <path d="M4 16 C8 9,24 9,28 16 C24 23,8 23,4 16Z"
-              fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
-            <circle cx="16" cy="16" r="4.5" fill="rgba(255,255,255,0.9)"/>
-            <polyline points="7,18 10,15 13,17 16,13 19,15 22,11 25,13"
-              stroke="white" stroke-width="1.4" fill="none"
-              stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
+        <svg width="30" height="38" viewBox="-3 -3 36 44" fill="none">
+          <defs>
+            <linearGradient id="pdfLg" x1="15" y1="0" x2="15" y2="38" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#A78BFA"/>
+              <stop offset="100%" stop-color="${PDF_BLUE}"/>
+            </linearGradient>
+          </defs>
+          <line x1="15" y1="2" x2="1" y2="34" stroke="url(#pdfLg)" stroke-width="4" stroke-linecap="round"/>
+          <line x1="15" y1="2" x2="29" y2="34" stroke="url(#pdfLg)" stroke-width="4" stroke-linecap="round"/>
+          <line x1="7" y1="21" x2="23" y2="21" stroke="url(#pdfLg)" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="15" cy="2" r="4" fill="#A78BFA"/>
+        </svg>
         <div>
-          <div style="font-size:22px;font-weight:800;
-            background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});
-            -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-            AmoSight
+          <div style="font-size:22px;font-weight:800;letter-spacing:-0.01em;line-height:1.15;">
+            <span style="color:${PDF_DARK};">Amo</span><span style="color:${PDF_BLUE};">Sight</span>
           </div>
           <div style="font-size:11px;color:${PDF_MUTED};">ניתוח והשוואת קופות גמל</div>
         </div>
@@ -846,55 +853,71 @@ async function generatePDF(funds, weights) {
   const fmtN = n => Math.round(n).toLocaleString('he-IL');
   const fmtD = (n, d = 1) => n != null ? (+n).toFixed(d) : '—';
   const riskMap = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
-  const totalPages = 1 + funds.length; // cover + one per fund
+  const totalPages = 1 + funds.length;
 
-  // ── Page 1: Cover with weights ──────────────────────────────────────────────
+  // ── Summary totals (same logic as SummaryHero) ───────────────────────────────
+  const totalCurrent   = funds.reduce((s, f) => s + (f.client.amount ?? 0), 0);
+  const totalPotential = funds.reduce((s, f) => s + getPotentialAmount(f), 0);
+  const totalDiff      = totalPotential - totalCurrent;
+  const totalDiffPct   = totalCurrent > 0 ? (totalDiff / totalCurrent) * 100 : 0;
+  const hasUpside      = totalDiff > 0;
+
+  // ── Page 1: Cover ────────────────────────────────────────────────────────────
   const coverHTML = `
     ${pdfHeader(today)}
-
-    <div style="margin-bottom:20px;">
-      <div style="font-size:18px;font-weight:800;color:${PDF_DARK};margin-bottom:6px;">
-        דוח השוואת קופות גמל
-      </div>
-      <div style="font-size:13px;color:${PDF_MUTED};">
-        ${funds.length} קופ${funds.length === 1 ? 'ה' : 'ות'} נותחו בדוח זה
-      </div>
+    <div style="margin-bottom:18px;">
+      <div style="font-size:18px;font-weight:800;color:${PDF_DARK};margin-bottom:4px;">דוח השוואת קופות גמל</div>
+      <div style="font-size:13px;color:${PDF_MUTED};">${funds.length} קופ${funds.length === 1 ? 'ה' : 'ות'} נותחו בדוח זה</div>
     </div>
 
-    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;
-      padding:20px 24px;margin-bottom:20px;">
-      <div style="font-size:13px;font-weight:700;color:${PDF_BLUE};margin-bottom:14px;">
-        פרמטרי החישוב — AmoScore
+    ${hasUpside ? `
+    <div style="background:#ffffff;border:1.5px solid rgba(234,179,8,0.5);
+      border-radius:16px;padding:24px 28px;margin-bottom:18px;text-align:center;direction:rtl;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#B45309;margin-bottom:18px;">💎 סיכום כלל הקופות</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:#78716C;margin-bottom:5px;letter-spacing:0.04em;">צבירה נוכחית</div>
+          <div style="font-size:32px;font-weight:900;color:#F87171;">₪${fmtN(totalCurrent)}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;color:#D97706;">←</div>
+          <div style="background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.45);
+            color:#B45309;font-size:12px;font-weight:800;padding:4px 12px;border-radius:999px;margin-top:4px;">
+            +₪${fmtN(totalDiff)} (${fmtD(totalDiffPct)}%)
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:#78716C;margin-bottom:5px;letter-spacing:0.04em;">פוטנציאל אם תעבור עכשיו</div>
+          <div style="font-size:32px;font-weight:900;color:#D97706;">₪${fmtN(totalPotential)}</div>
+        </div>
       </div>
-      <div style="display:flex;gap:16px;">
-        ${[
-          ['תשואה שנה',     weights.w1],
-          ['תשואה 3 שנים',  weights.w3],
-          ['תשואה 5 שנים',  weights.w5],
-          ['Sharp Ratio',   weights.wSharp],
-        ].map(([label, val]) => `
-          <div style="flex:1;text-align:center;background:#fff;border:1px solid #DBEAFE;
-            border-radius:10px;padding:14px 10px;">
-            <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:6px;">${label}</div>
-            <div style="font-size:22px;font-weight:800;color:${PDF_BLUE};">${val}%</div>
+      <div style="margin-top:14px;font-size:11px;color:#92400E;border-top:1px solid rgba(234,179,8,0.2);padding-top:10px;">
+        השנה החמצת <strong style="color:#B45309;">₪${fmtN(totalDiff)}</strong> — עדיין לא מאוחר לשנות
+      </div>
+    </div>` : ''}
+
+    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:18px 22px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:${PDF_BLUE};margin-bottom:12px;">פרמטרי החישוב — AmoScore</div>
+      <div style="display:flex;gap:14px;">
+        ${[['תשואה שנה',weights.w1],['תשואה 3 שנים',weights.w3],['תשואה 5 שנים',weights.w5],['Sharp Ratio',weights.wSharp]]
+          .map(([label, val]) => `
+          <div style="flex:1;text-align:center;background:#fff;border:1px solid #DBEAFE;border-radius:10px;padding:12px 8px;">
+            <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:5px;">${label}</div>
+            <div style="font-size:20px;font-weight:800;color:${PDF_BLUE};">${val}%</div>
           </div>`).join('')}
       </div>
     </div>
-
-    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:18px 24px;">
-      <div style="font-size:12px;font-weight:700;color:${PDF_MUTED};margin-bottom:8px;
-        text-transform:uppercase;letter-spacing:0.06em;">כיצד מחושב AmoScore?</div>
-      <div style="font-size:12px;color:${PDF_MUTED};line-height:1.7;">
+    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:16px 22px;">
+      <div style="font-size:11px;font-weight:700;color:${PDF_MUTED};margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">כיצד מחושב AmoScore?</div>
+      <div style="font-size:11px;color:${PDF_MUTED};line-height:1.7;">
         AmoScore מחושב על בסיס 4 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, ו-Sharp Ratio.
-        כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה,
-        ולאחר מכן מוכפל במשקל שנבחר. הציון הסופי הוא הסכום המשוקלל.
+        כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה, ולאחר מכן מוכפל במשקל שנבחר.
       </div>
     </div>
-
     ${pdfFooter(1, totalPages)}`;
 
   // ── Per-fund pages ──────────────────────────────────────────────────────────
-  const fundPages = funds.map(({ client, alternatives }, fi) => {
+  const fundPages = funds.map(({ client, alternatives, golden }, fi) => {
     const clientIsTop3 = client.rank != null && client.rank <= 3;
     const allRows = [
       { ...client, isClient: true, potential_amount: client.amount, diff: null },
@@ -908,33 +931,40 @@ async function generatePDF(funds, weights) {
 
       return `
         <tr style="background:${bg};">
-          <td style="padding:9px 12px;font-weight:600;color:${PDF_TEXT};">
+          <td style="padding:13px 16px;font-weight:600;color:${PDF_TEXT};font-size:14px;">
             ${f.isClient ? `<span style="color:${clientColor};font-weight:800;">${f.rank ?? idx+1}</span>`
                          : idx + 1}
             ${idx < 3 && !f.isClient
-              ? `<span style="background:#EFF6FF;color:${PDF_BLUE};font-size:9px;
-                  font-weight:700;padding:2px 6px;border-radius:8px;margin-right:4px;">מומלץ</span>`
+              ? `<span style="background:#EFF6FF;color:${PDF_BLUE};font-size:10px;
+                  font-weight:700;padding:3px 7px;border-radius:8px;margin-right:4px;">מומלץ</span>`
               : ''}
           </td>
-          <td style="padding:9px 12px;color:${PDF_TEXT};font-weight:${f.isClient ? '700' : '400'};">
+          <td style="padding:13px 16px;color:${PDF_TEXT};font-weight:${f.isClient ? '700' : '400'};font-size:14px;">
             ${f.name}
+            ${f.hevra ? `<div style="font-size:11px;color:${PDF_MUTED};margin-top:2px;">${f.hevra}</div>` : ''}
+            ${f.id ? `<div style="font-size:11px;color:${PDF_MUTED};">קופה #${f.id}</div>` : ''}
             ${f.isClient
               ? `<span style="background:${clientIsTop3 ? '#EFF6FF' : '#FEF2F2'};
-                  color:${clientColor};font-size:9px;font-weight:700;
-                  padding:2px 6px;border-radius:8px;margin-right:6px;">הקופה שלך</span>`
+                  color:${clientColor};font-size:10px;font-weight:700;
+                  padding:3px 7px;border-radius:8px;margin-right:6px;">הקופה שלך</span>`
               : ''}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};font-weight:600;">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
             ${f.grade ? fmtD(f.grade) : '–'}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
             ${f.tsua_1 != null ? fmtD(f.tsua_1) + '%' : '—'}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
             ${riskMap[client.risk_level] ?? '—'}
           </td>
-          <td style="padding:9px 12px;text-align:center;color:${PDF_TEXT};font-weight:600;">
+          <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
             ${f.potential_amount != null ? '₪' + fmtN(f.potential_amount) : '—'}
+          </td>
+          <td style="padding:13px 16px;text-align:center;font-weight:700;font-size:14px;
+            color:${f.diff == null ? PDF_MUTED : f.diff >= 0 ? '#16A34A' : '#EF4444'};">
+            ${f.diff == null ? '—' : (f.diff >= 0 ? '+' : '') + '₪' + fmtN(Math.abs(f.diff))
+              + (f.diff_percent != null ? `<div style="font-size:11px;font-weight:600;">${f.diff >= 0 ? '+' : ''}${fmtD(f.diff_percent)}%</div>` : '')}
           </td>
         </tr>`;
     }).join('');
@@ -960,7 +990,7 @@ async function generatePDF(funds, weights) {
             ['סכום צבירה',     '₪' + fmtN(client.amount)],
             ['תשואה שנתית',    client.tsua_1 ? fmtD(client.tsua_1) + '%' : 'N/A'],
             ['AmoScore',       client.grade ? fmtD(client.grade) : '–'],
-            ['דמי ניהול',      client.dmei_nihul != null ? fmtD(client.dmei_nihul) + '%' : '—'],
+            ['דמי ניהול',      client.dmei_nihul != null ? fmtD(client.dmei_nihul, 2) + '%' : '—'],
           ].map(([label, val]) => `
             <div style="flex:1;background:#fff;border:1px solid #DBEAFE;
               border-radius:8px;padding:12px;text-align:center;">
@@ -970,50 +1000,200 @@ async function generatePDF(funds, weights) {
         </div>
       </div>
 
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px;">
         <thead>
           <tr style="background:linear-gradient(135deg,${PDF_BLUE},${PDF_PURPLE});">
-            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600;">דירוג</th>
-            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600;">שם הקופה</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">AmoScore</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">תשואה שנתית</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">רמת סיכון</th>
-            <th style="padding:10px 12px;text-align:center;color:#fff;font-weight:600;">סכום פוטנציאלי</th>
+            <th style="padding:13px 16px;text-align:right;color:#fff;font-weight:700;font-size:13px;">דירוג</th>
+            <th style="padding:13px 16px;text-align:right;color:#fff;font-weight:700;font-size:13px;">שם הקופה</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">AmoScore</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">תשואה שנתית</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">רמת סיכון</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">סכום פוטנציאלי</th>
+            <th style="padding:13px 16px;text-align:center;color:#fff;font-weight:700;font-size:13px;">הפרש</th>
           </tr>
         </thead>
         <tbody>${rowsHTML}</tbody>
       </table>
-      <div style="font-size:10px;color:${PDF_MUTED};margin-top:6px;">
+      <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:20px;">
         * לא נוכו דמי ניהול חיצוניים מהחישוב
       </div>
+
+      ${(() => {
+        const showMissed = alternatives[0] && client.rank !== 1 && alternatives[0].potential_amount > client.amount;
+        const showGold   = golden && golden.potential_amount != null && golden.potential_amount > client.amount;
+        if (!showMissed && !showGold) return '';
+        const best = alternatives[0];
+        const missedHTML = showMissed ? `
+          <div style="flex:1;min-width:220px;display:flex;align-items:flex-start;gap:10px;
+            background:linear-gradient(135deg,rgba(30,27,75,0.08),rgba(49,46,129,0.04));
+            border:1.5px solid rgba(67,56,202,0.3);border-radius:12px;padding:16px 18px;">
+            <div style="font-size:22px;flex-shrink:0;">⚡</div>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:800;color:#4F46E5;margin-bottom:5px;">מה החמצת?</div>
+              <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:10px;line-height:1.5;">
+                מעבר לקופה המובילה היה מגדיל ב-<strong style="color:#4F46E5;">${fmtD(best.diff_percent)}%</strong>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div>
+                  <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">היום</div>
+                  <div style="font-size:16px;font-weight:800;color:${PDF_TEXT};">₪${fmtN(client.amount)}</div>
+                  ${client.tsua_1 ? `<div style="font-size:9px;color:${PDF_MUTED};">${fmtD(client.tsua_1)}%</div>` : ''}
+                </div>
+                <div style="font-size:16px;color:#4F46E5;margin-top:12px;">←</div>
+                <div>
+                  <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">פוטנציאל</div>
+                  <div style="font-size:16px;font-weight:800;color:#16A34A;">₪${fmtN(best.potential_amount)}</div>
+                  ${best.tsua_1 ? `<div style="font-size:9px;color:${PDF_MUTED};">${fmtD(best.tsua_1)}%</div>` : ''}
+                </div>
+              </div>
+            </div>
+          </div>` : '';
+        const goldHTML = showGold ? `
+          <div style="flex:1;min-width:220px;display:flex;align-items:flex-start;gap:10px;
+            background:linear-gradient(135deg,rgba(120,83,15,0.08),rgba(161,110,20,0.04));
+            border:1.5px solid rgba(234,179,8,0.5);border-radius:12px;padding:16px 18px;">
+            <div style="font-size:22px;flex-shrink:0;">🏆</div>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:800;color:#B45309;margin-bottom:2px;">תפוח הזהב</div>
+              <div style="font-size:9px;color:#D97706;font-weight:600;margin-bottom:8px;">מקום #1 סיכון גבוה${golden.name ? ' · ' + golden.name : ''}${golden.id ? ' · #' + golden.id : ''}</div>
+              <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:10px;line-height:1.5;">
+                מעבר לסיכון גבוה הייתה מגדילה ב-<strong style="color:#B45309;">${fmtD(golden.diff_percent)}%</strong>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div>
+                  <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">היום</div>
+                  <div style="font-size:16px;font-weight:800;color:${PDF_TEXT};">₪${fmtN(client.amount)}</div>
+                </div>
+                <div style="font-size:16px;color:#D97706;margin-top:12px;">←</div>
+                <div>
+                  <div style="font-size:9px;color:${PDF_MUTED};margin-bottom:2px;">פוטנציאל</div>
+                  <div style="font-size:16px;font-weight:800;color:#B45309;">₪${fmtN(golden.potential_amount)}</div>
+                  ${golden.tsua_1 ? `<div style="font-size:9px;color:#D97706;">${fmtD(golden.tsua_1)}%</div>` : ''}
+                </div>
+              </div>
+            </div>
+          </div>` : '';
+        return `<div style="display:flex;gap:12px;flex-wrap:wrap;">${missedHTML}${goldHTML}</div>`;
+      })()}
 
       ${pdfFooter(fi + 2, totalPages)}`;
   });
 
-  // ── Render all pages & build PDF ────────────────────────────────────────────
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  const pageW = 210;
-  const pageH = 297;
-
+  // ── Per-page render: one small html2canvas per page (much faster for many funds) ──
+  const pdf   = new jsPDF('p', 'mm', 'a4');
+  const pageW = 210, pageH = 297;
   const allPages = [coverHTML, ...fundPages];
-  for (let i = 0; i < allPages.length; i++) {
-    if (i > 0) pdf.addPage();
-    const canvas = await captureElement(allPages[i]);
-    const imgData = canvas.toDataURL('image/png');
-    const imgH = (canvas.height * pageW) / canvas.width;
-    // If content overflows one page, tile it
-    let y = 0;
-    while (y < imgH) {
-      if (y > 0) { pdf.addPage(); }
-      pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
-      y += pageH;
+  const pageStyle = `padding:40px 48px;box-sizing:border-box;background:#ffffff;`;
+  const wrapStyle = `position:absolute;top:0;left:-9999px;width:794px;background:#ffffff;direction:rtl;font-family:'Rubik',Arial,sans-serif;color:${PDF_TEXT};`;
+
+  await document.fonts.ready;
+
+  let firstPage = true;
+  for (const html of allPages) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = wrapStyle;
+    const page = document.createElement('div');
+    page.style.cssText = pageStyle;
+    page.innerHTML = html;
+    wrap.appendChild(page);
+    document.body.appendChild(wrap);
+
+    // One RAF to let the browser paint before capture
+    await new Promise(r => requestAnimationFrame(r));
+
+    try {
+      const canvas = await html2canvas(wrap, {
+        scale: 1.5, backgroundColor: '#ffffff',
+        useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 794,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.88);
+      const imgH    = (canvas.height * pageW) / canvas.width;
+
+      if (!firstPage) pdf.addPage();
+      firstPage = false;
+
+      let y = 0;
+      while (y < imgH) {
+        if (y > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH);
+        y += pageH;
+      }
+    } finally {
+      document.body.removeChild(wrap);
     }
   }
 
   const dateStr = today.replace(/\//g, '-');
-  const now = new Date();
+  const now     = new Date();
   const timeStr = `${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
   pdf.save(`AmoSight-${dateStr}_${timeStr}.pdf`);
+}
+
+// ─── Summary Hero helpers ─────────────────────────────────────────────────────
+
+// Takes the best of (same-risk alt, golden) vs current — for the summary total
+function getPotentialAmount(fund) {
+  const { client, alternatives, golden } = fund;
+  const bestAlt = alternatives?.[0];
+  const sameRiskPotential = (bestAlt && client.rank !== 1) ? (bestAlt.potential_amount ?? 0) : 0;
+  const goldenPotential   = golden?.potential_amount ?? 0;
+  const best = Math.max(sameRiskPotential, goldenPotential);
+  return best > client.amount ? best : client.amount;
+}
+
+function SummaryHero({ results }) {
+  const totalCurrent   = results.reduce((s, f) => s + (f.client.amount ?? 0), 0);
+  const totalPotential = results.reduce((s, f) => s + getPotentialAmount(f), 0);
+  const diff           = totalPotential - totalCurrent;
+  const diffPct        = totalCurrent > 0 ? (diff / totalCurrent) * 100 : 0;
+  const hasUpside      = diff > 0;
+  const fmt            = n => Math.round(n).toLocaleString('he-IL');
+  const fmtD           = n => (+n).toFixed(1);
+
+  return (
+    <div className="summary-hero">
+      <div className="summary-hero-label">סיכום כלל הקופות 💎</div>
+
+      <div className="summary-hero-row">
+        {/* Current */}
+        <div className="summary-hero-block">
+          <div className="summary-hero-block-label">צבירה נוכחית</div>
+          <div className="summary-hero-amount summary-hero-amount--current">
+            ₪{fmt(totalCurrent)}
+          </div>
+        </div>
+
+        {/* Arrow */}
+        <div className="summary-hero-vs">
+          {hasUpside ? (
+            <div className="summary-hero-arrow-wrap">
+              <span className="summary-hero-arrow">←</span>
+              <span className="summary-hero-diff-badge">
+                +₪{fmt(diff)}<span className="summary-hero-diff-pct"> ({fmtD(diffPct)}%)</span>
+              </span>
+            </div>
+          ) : (
+            <span className="summary-hero-checkmark">✓</span>
+          )}
+        </div>
+
+        {/* Potential */}
+        <div className="summary-hero-block">
+          <div className="summary-hero-block-label">פוטנציאל</div>
+          <div className={`summary-hero-amount ${hasUpside ? 'summary-hero-amount--potential' : 'summary-hero-amount--current'}`}>
+            ₪{fmt(totalPotential)}
+          </div>
+        </div>
+      </div>
+
+      {hasUpside && (
+        <div className="summary-hero-cta">
+          השנה החמצת <strong>₪{fmt(diff)}</strong> — עדיין לא מאוחר לשנות
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
@@ -1044,23 +1224,35 @@ function ResultsScreen({ results, weights, onReset }) {
       <Header onReset={onReset} />
       <div id="results-content" className="results-content">
 
-        {results && results.length > 1 && (
-          <div className="results-filter">
-            <label className="results-filter-label">הצג קופה:</label>
-            <select
-              className="results-filter-select"
-              value={selectedId}
-              onChange={e => setSelectedId(e.target.value)}
-            >
-              <option value="all">כל הקופות ({results.length})</option>
-              {results.map((d, i) => (
-                <option key={d.client?.id ?? i} value={d.client?.id}>
-                  #{d.client?.id} — {d.client?.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        {results && results.length > 0 && (
+          <SummaryHero results={results} />
         )}
+
+        {results && results.length > 1 && (() => {
+          const grouped = [];
+          const seen = new Map();
+          for (const d of results) {
+            const id = d.client?.id;
+            if (seen.has(id)) { seen.get(id).count++; } else { const entry = { id, name: d.client?.name, count: 1 }; seen.set(id, entry); grouped.push(entry); }
+          }
+          return (
+            <div className="results-filter">
+              <label className="results-filter-label">הצג קופה:</label>
+              <select
+                className="results-filter-select"
+                value={selectedId}
+                onChange={e => setSelectedId(e.target.value)}
+              >
+                <option value="all">כל הקופות ({results.length})</option>
+                {grouped.map(({ id, name, count }) => (
+                  <option key={id} value={id}>
+                    #{id} — {name}{count > 1 ? ` (×${count})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })()}
 
         {filtered.map((data, i) => (
           <div key={(data.client?.id ?? i) + '-' + i}>

@@ -23,6 +23,9 @@ def parse_xml_file(content):
     hey = ET.parse(content)
     root = hey.getroot()
     for row in root.findall("Row"):
+        oclusia = extract_data_from_xml("UCHLUSIYAT_YAAD", row)
+        if oclusia != "כלל האוכלוסיה":
+            continue
         SUG_KUPA = extract_data_from_xml("SUG_KUPA", row)
         ID = extract_data_from_xml("ID", row)
         SHM_KUPA = extract_data_from_xml("SHM_KUPA", row)
