@@ -22,6 +22,7 @@ const ALT_GRADIENTS = [
 
 const RISK_LABELS = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
 const RISK_COLORS = { low: '#10B981', medium: '#3B82F6', high: '#F59E0B' };
+const RISK_EXPOSURE = { low: '0–25% חשיפה למניות', medium: '25–75% חשיפה למניות', high: '75–100% חשיפה למניות' };
 
 const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 45 };
 
@@ -535,8 +536,17 @@ function FundResults({ data, weights }) {
         <div className="client-card-accent" style={{ background: riskColor }} />
         <div className="client-card-info">
           <div className="client-card-pills">
-            <span className="risk-pill" style={{ background: `${riskColor}22`, color: riskColor, borderColor: `${riskColor}55` }}>
+            <span
+              className="risk-pill"
+              style={{ background: `${riskColor}22`, color: riskColor, borderColor: `${riskColor}55` }}
+              title={RISK_EXPOSURE[client.risk_level]}
+            >
               ● רמת סיכון {riskLabel}
+              {client.risk_level && (
+                <span style={{ fontSize: '10px', opacity: 0.8, marginRight: '6px', fontWeight: 400 }}>
+                  ({RISK_EXPOSURE[client.risk_level]})
+                </span>
+              )}
             </span>
             {!isNew && client.rank != null && (
               <span className={`rank-pill ${clientIsTop ? 'rank-pill--good' : 'rank-pill--bad'}`}>
