@@ -1,6 +1,9 @@
+"""Parser for the GemeNet fund XML file (kupot_gemel_net.xml)."""
+
 # ----- Imports ----- #
 
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from src.core.risk_classifier import get_risk_level
 from src.parsers.xml_utils import extract_data_from_xml
@@ -8,7 +11,23 @@ from src.parsers.xml_utils import extract_data_from_xml
 # ----- Functions ----- #
 
 
-def parse_xml_file(content):
+def parse_xml_file(content: Path) -> list[dict]:
+    """Parse the GemeNet kupot XML file and return a list of kupa records.
+
+    Only rows whose ``UCHLUSIYAT_YAAD`` field equals ``"כלל האוכלוסיה"``
+    (general population) are included.  Each returned dict contains
+    identifiers, performance metrics, and a pre-computed risk level.
+
+    Args:
+        content: Path to the GemeNet XML file to parse.
+
+    Returns:
+        A list of dicts, each representing one kupa with the following keys:
+        ``SUG``, ``ID``, ``tsua_mitztaberet_letkufa``,
+        ``sharp_ribit_hasarot_sikun``, ``shem_kupa``, ``hevra``,
+        ``hitmahut_rashit``, ``hitmahut_mishnit``, ``tsua_3``, ``tsua_5``,
+        ``num_hevra``, and ``risk_level``.
+    """
     list_of_kupot = []
     hey = ET.parse(content)
     root = hey.getroot()

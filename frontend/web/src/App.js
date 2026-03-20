@@ -524,7 +524,8 @@ function FundResults({ data, weights }) {
     return color;
   });
 
-  const medals = ['🥇', '🥈', '🥉'];
+  const topRankColors = ['#F59E0B', '#94A3B8', '#C084FC'];
+  const topRankBg = ['rgba(245,158,11,0.15)', 'rgba(148,163,184,0.15)', 'rgba(192,132,252,0.15)'];
 
   return (
     <div className="fund-results fade-in fund-section">
@@ -600,7 +601,12 @@ function FundResults({ data, weights }) {
         <div className="chart-bars">
           <div className="bar-row bar-row--client">
             <div className="bar-label bar-label--client">
-              {shortName(client.name)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', direction: 'rtl' }}>
+                {client.rank != null && (
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: clientIsTop ? '#F59E0B' : '#6B7280' }}>#{client.rank}</span>
+                )}
+                <span>{shortName(client.name)}</span>
+              </div>
               <span className="bar-client-tag">הקופה שלך</span>
             </div>
             <div className="bar-track bar-track--client">
@@ -614,10 +620,12 @@ function FundResults({ data, weights }) {
           </div>
           {alternatives.map((alt, i) => {
             const tsua = alt.tsua_1 ?? 0;
+            const altRank = sortedFunds.findIndex(f => f.id === alt.id) + 1;
+            const rankColorIdx = altRank - 1;
             return (
               <div key={alt.id} className="bar-row">
                 <div className="bar-label">
-                  <span style={{ marginLeft: '4px' }}>{medals[i] ?? ''}</span>
+                  <span style={{ marginLeft: '4px', display: 'inline-block', minWidth: '22px', textAlign: 'center', fontWeight: 700, fontSize: '12px', color: topRankColors[rankColorIdx] ?? '#6B7280' }}>#{altRank}</span>
                   {shortName(alt.name)}
                 </div>
                 <div className="bar-track">
@@ -658,14 +666,17 @@ function FundResults({ data, weights }) {
               {sortedFunds.map((fund, idx) => {
                 const color = fundColors[idx];
                 const diffNeg = fund.diff != null && fund.diff < 0;
-                const medal = !fund.isClient && idx < 3 ? medals[idx] : null;
+                const isTopThree = !fund.isClient && idx < 3;
                 return (
                   <tr key={fund.id} className={fund.isClient ? (clientIsTop ? 'row-client' : 'row-client row-client--bad') : 'row-alt'}>
                     <td>
-                      {medal
-                        ? <span className="medal-badge">{medal}</span>
-                        : <span className="rank-badge" style={{ background: `${color}33`, color }}>{fund.isClient ? (fund.rank ?? '–') : idx + 1}</span>
-                      }
+                      <span className="rank-badge" style={{
+                        background: isTopThree ? topRankBg[idx] : `${color}33`,
+                        color: isTopThree ? topRankColors[idx] : color,
+                        fontWeight: isTopThree ? 700 : 600,
+                      }}>
+                        {fund.isClient ? (fund.rank ?? '–') : idx + 1}
+                      </span>
                     </td>
                     <td className="td-name">
                       <div>{fund.name}</div>

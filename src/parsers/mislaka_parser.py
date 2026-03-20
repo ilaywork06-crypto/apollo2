@@ -1,3 +1,5 @@
+"""Parser for Mislaka (pension clearinghouse) XML files."""
+
 # ----- Imports ----- #
 
 import re
@@ -9,7 +11,20 @@ from src.parsers.xml_utils import extract_data_from_xml
 # ----- Functions ----- #
 
 
-def _map_dmey_nihul(root, sug):
+def _map_dmey_nihul(root: ET._Element, sug: int) -> dict[str, float]:
+    """Build a lookup of management-fee rates by investment-track code.
+
+    Iterates over all ``PerutMivneDmeiNihul`` elements in the XML tree and
+    collects fee rates for the requested expense type (``SUG-HOTZAA``).
+
+    Args:
+        root: Root lxml element of the parsed Mislaka XML document.
+        sug: Expense-type code to filter on (``1`` = accumulation fee,
+            ``2`` = deposit fee).
+
+    Returns:
+        A dict mapping investment-track code strings to their fee rate floats.
+    """
     result = {}
     for row in root.iter("PerutMivneDmeiNihul"):
         if extract_data_from_xml(".//SUG-HOTZAA", row, int) == sug:
@@ -19,14 +34,39 @@ def _map_dmey_nihul(root, sug):
     return result
 
 
-def parse_multible_mislaka_files(files):
+def parse_multible_mislaka_files(files: list[str]) -> list[dict]:
+    """Parse multiple Mislaka file strings and combine the results.
+
+    Args:
+        files: A list of decoded Mislaka XML file strings.
+
+    Returns:
+        A flat list of investment-track dicts from all provided files.
+    """
     result = []
     for file in files:
         result.extend(parse_mislaka_file(file))
     return result
 
 
-def parse_mislaka_file(content):
+def parse_mislaka_file(content: str | bytes) -> list[dict]:
+    """Parse a single Mislaka XML document and extract per-track holding data.
+
+    Strips any XML declaration before parsing (lxml requirement for
+    ``fromstring``).  Management fees are resolved by taking the maximum of the
+    structure-level fee and the track-level fee to ensure the most conservative
+    (highest-cost) assumption is used.
+
+    Args:
+        content: The Mislaka XML document as a UTF-8 string or bytes object.
+
+    Returns:
+        A list of dicts, each representing one investment track with the
+        following keys: ``GEMELNET_ID``, ``SHEM-TOCHNIT``,
+        ``TAARICH-HITZTARFUT-MUTZAR``, ``TOTAL-CHISACHON-MTZBR``,
+        ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``, and
+        ``KOD-MEZAHE-YATZRAN``.
+    """
     if isinstance(content, str):
         content = re.sub(r"<\?xml[^?]*\?>", "", content).strip()
         content = content.encode("utf-8")

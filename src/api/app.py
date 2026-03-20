@@ -1,3 +1,5 @@
+"""FastAPI application entry point for the Apollo fund comparison service."""
+
 # ----- Imports ----- #
 
 from fastapi import FastAPI, File, Form, UploadFile
@@ -30,7 +32,19 @@ async def compare(
     weight_5: int = Form(),
     weight_sharp: int = Form(),
     mislaka_file: list[UploadFile] = File(...),
-    ):
+) -> dict:
+    """Run a fund comparison based on uploaded Mislaka files and user-supplied weights.
+
+    Args:
+        weight_1: Weight applied to the 1-year cumulative return metric.
+        weight_3: Weight applied to the 3-year average annual return metric.
+        weight_5: Weight applied to the 5-year average annual return metric.
+        weight_sharp: Weight applied to the Sharpe ratio metric.
+        mislaka_file: One or more Mislaka XML files uploaded by the client.
+
+    Returns:
+        A dict containing a ``funds`` key with the ranked comparison results.
+    """
     l_con = []
     for file in mislaka_file:
         mislaka_content = (await file.read()).decode("utf-8-sig")
@@ -46,7 +60,12 @@ async def compare(
 
 
 @APP.get("/health")
-async def health():
+async def health() -> dict:
+    """Return a simple health-check response indicating the service is running.
+
+    Returns:
+        A dict with a ``status`` key set to ``"ok"``.
+    """
     return {"status": "ok"}
 
 
