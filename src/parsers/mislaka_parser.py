@@ -101,6 +101,8 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                     extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON-MIVNE", maslul, float),
                     extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON", maslul, float),
                 )
+                if FINAL_DMEI_NIHUL_TZVIRA == 0.0:
+                    FINAL_DMEI_NIHUL_TZVIRA = extract_data_from_xml(".//SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH", maslul, float)
                 FINAL_DMEI_NIHUL_HAFKADA = max(
                     dmey_nihul_hafkada_map.get(KOD_MASLUL_HASHKAA, 0.0),
                     extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HAFKADA-MIVNE", polisa, float),
