@@ -10,6 +10,18 @@ from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
 
+def remove_bad_hevrot(list_of_kupot: list[dict]) -> list[dict]:
+    """Remove records with invalid or excluded company names.
+
+    Args:
+        list_of_kupot: A list of kupa dicts, each containing a ``hevra`` key.
+
+    Returns:
+        A filtered list of kupa dicts, excluding those whose ``hevra`` value
+        is in the predefined set of bad company names.
+    """
+    bad_hevrot = {'אינפיניטי השתלמות, גמל ופנסיה בע"מ'}
+    return [kupa for kupa in list_of_kupot if kupa["hevra"] not in bad_hevrot]
 
 def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int) -> list[dict]:
     """Parse the GemeNet kupot XML file and return a list of kupa records.
@@ -65,7 +77,6 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
             row,
             float,
         )
-
         list_of_kupot.append(
             {
                 "SUG": SUG_KUPA.strip(),
@@ -82,5 +93,5 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
                 "risk_level": RISK_LEVEL,
             }
         )
-
-    return list_of_kupot
+        
+    return remove_bad_hevrot(list_of_kupot)
