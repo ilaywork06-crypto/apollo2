@@ -22,7 +22,11 @@ const ALT_GRADIENTS = [
 
 const RISK_LABELS = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
 const RISK_COLORS = { low: '#10B981', medium: '#3B82F6', high: '#F59E0B' };
-const RISK_EXPOSURE = { low: '0–25% חשיפה למניות', medium: '25–75% חשיפה למניות', high: '75–100% חשיפה למניות' };
+const getRiskExposure = (thresholds) => ({
+  low:    `0–${thresholds.low}% חשיפה למניות`,
+  medium: `${thresholds.low}–${thresholds.medium}% חשיפה למניות`,
+  high:   `${thresholds.medium}–100% חשיפה למניות`,
+});
 
 const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 45 };
 
@@ -36,6 +40,35 @@ const WEIGHT_FIELDS = [
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 const fmt = n => Math.round(n).toLocaleString('he-IL');
+
+// ─── Kupa Aggregation ─────────────────────────────────────────────────────────
+
+function aggregateResults(results) {
+  const groups = new Map();
+  for (const item of results) {
+    const id = item.client?.id;
+    if (!groups.has(id)) {
+      groups.set(id, { ...item, client: { ...item.client } });
+    } else {
+      groups.get(id).client.amount = (groups.get(id).client.amount ?? 0) + (item.client.amount ?? 0);
+    }
+  }
+  return Array.from(groups.values()).map(item => {
+    const newAmount = item.client.amount ?? 0;
+    const recalcAlts = (item.alternatives ?? []).map(alt => ({
+      ...alt,
+      potential_amount: newAmount * (1 + (alt.diff_percent ?? 0) / 100),
+      diff: newAmount * (alt.diff_percent ?? 0) / 100,
+    }));
+    const golden = item.golden ? {
+      ...item.golden,
+      potential_amount: newAmount * (1 + (item.golden.diff_percent ?? 0) / 100),
+      diff: newAmount * (item.golden.diff_percent ?? 0) / 100,
+    } : item.golden;
+    return { ...item, alternatives: recalcAlts, golden };
+  });
+}
+
 const fmtDec = (n, d = 1) => n != null ? (+n).toFixed(d) : '—';
 const shortName = name => name?.split(' ').slice(0, 3).join(' ') || name;
 
@@ -354,9 +387,124 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
   );
 }
 
+// ─── Risk Band Editor ─────────────────────────────────────────────────────────
+
+const DEFAULT_THRESHOLDS = { low: 25, medium: 75 };
+
+function RiskBandEditor({ low, medium, onChange }) {
+  const isDefault = low === DEFAULT_THRESHOLDS.low && medium === DEFAULT_THRESHOLDS.medium;
+
+  const setLow = (val) => {
+    const v = Math.max(0, Math.min(val, medium - 5));
+    onChange({ low: v, medium });
+  };
+
+  const setMedium = (val) => {
+    const v = Math.max(low + 5, Math.min(val, 100));
+    onChange({ low, medium: v });
+  };
+
+  const lowW  = low;
+  const medW  = medium - low;
+  const highW = 100 - medium;
+
+  return (
+    <div className="risk-band-editor">
+
+      {/* ── Visual bar ── */}
+      <div className="risk-band-bar-wrap" dir="ltr">
+        <div className="risk-band-bar">
+          <div className="risk-band-seg risk-band-seg--low"    style={{ width: `${lowW}%`  }}>
+            {lowW  >= 12 && <span className="risk-band-seg-label">נמוך</span>}
+          </div>
+          <div className="risk-band-seg risk-band-seg--medium" style={{ width: `${medW}%`  }}>
+            {medW  >= 12 && <span className="risk-band-seg-label">בינוני</span>}
+          </div>
+          <div className="risk-band-seg risk-band-seg--high"   style={{ width: `${highW}%` }}>
+            {highW >= 12 && <span className="risk-band-seg-label">גבוה</span>}
+          </div>
+        </div>
+
+        {/* Threshold markers */}
+        <div className="risk-band-marker" style={{ left: `${low}%` }}>
+          <div className="risk-band-marker-line" />
+          <div className="risk-band-marker-label">{low}%</div>
+        </div>
+        <div className="risk-band-marker" style={{ left: `${medium}%` }}>
+          <div className="risk-band-marker-line" />
+          <div className="risk-band-marker-label">{medium}%</div>
+        </div>
+      </div>
+
+      {/* ── Zone legend ── */}
+      <div className="risk-band-legend">
+        <div className="risk-band-legend-item">
+          <span className="risk-band-dot risk-band-dot--low" />
+          <span className="risk-band-legend-text">
+            <strong>נמוך</strong> — 0%–{low}% חשיפה
+          </span>
+        </div>
+        <div className="risk-band-legend-item">
+          <span className="risk-band-dot risk-band-dot--medium" />
+          <span className="risk-band-legend-text">
+            <strong>בינוני</strong> — {low}%–{medium}% חשיפה
+          </span>
+        </div>
+        <div className="risk-band-legend-item">
+          <span className="risk-band-dot risk-band-dot--high" />
+          <span className="risk-band-legend-text">
+            <strong>גבוה</strong> — {medium}%–100% חשיפה
+          </span>
+        </div>
+      </div>
+
+      {/* ── Controls ── */}
+      <div className="risk-band-controls">
+        <div className="risk-band-control">
+          <div className="risk-band-control-title">
+            <span className="risk-band-dot risk-band-dot--low" />
+            גבול נמוך ↔ בינוני
+          </div>
+          <div className="weight-stepper">
+            <button className="weight-btn" onClick={() => setLow(low - 5)} disabled={low <= 0}>−</button>
+            <span className="weight-val">{low}%</span>
+            <button className="weight-btn" onClick={() => setLow(low + 5)} disabled={low >= medium - 5}>+</button>
+          </div>
+          <div className="risk-band-control-hint">חשיפה מנייתית מתחת ל-{low}% = סיכון נמוך</div>
+        </div>
+
+        <div className="risk-band-divider" />
+
+        <div className="risk-band-control">
+          <div className="risk-band-control-title">
+            <span className="risk-band-dot risk-band-dot--high" />
+            גבול בינוני ↔ גבוה
+          </div>
+          <div className="weight-stepper">
+            <button className="weight-btn" onClick={() => setMedium(medium - 5)} disabled={medium <= low + 5}>−</button>
+            <span className="weight-val">{medium}%</span>
+            <button className="weight-btn" onClick={() => setMedium(medium + 5)} disabled={medium >= 100}>+</button>
+          </div>
+          <div className="risk-band-control-hint">חשיפה מנייתית מעל {medium}% = סיכון גבוה</div>
+        </div>
+      </div>
+
+      {!isDefault && (
+        <button
+          className="quick-action-btn quick-action-btn--reset"
+          style={{ marginTop: '14px' }}
+          onClick={() => onChange(DEFAULT_THRESHOLDS)}
+        >
+          ↺ איפוס לברירת מחדל (25% / 75%)
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, onAnalyze }) {
+function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameKupa, onSumSameKupaChange, onAnalyze }) {
   const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
   const ready = mislakaFiles.length > 0 && sum === 100;
   const hasFiles = mislakaFiles.length > 0;
@@ -439,6 +587,45 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           <WeightsForm weights={weights} onChange={onWeightsChange} />
         </div>
 
+        {/* ── Step 3: Risk Thresholds ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header">
+            <div className="step-card-num">03</div>
+            <div className="step-card-label">הגדרת סף רמות סיכון</div>
+          </div>
+          <RiskBandEditor
+            low={thresholds.low}
+            medium={thresholds.medium}
+            onChange={onThresholdsChange}
+          />
+        </div>
+
+        {/* ── Step 4: Aggregate ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header">
+            <div className="step-card-num">04</div>
+            <div className="step-card-label">איחוד קופות זהות</div>
+          </div>
+          <div className="aggregate-toggle-row">
+            <div className="aggregate-toggle-info">
+              <div className="aggregate-toggle-title">סכום מופעים של אותה קופה</div>
+              <div className="aggregate-toggle-desc">
+                {sumSameKupa
+                  ? 'מופעים מרובים של אותה קופה (לפי מספר קופה) יאוחדו וסכום הצבירות יסוכם'
+                  : 'כל מופע של קופה יוצג בנפרד, גם אם מספר הקופה זהה'}
+              </div>
+            </div>
+            <label className="kupa-toggle">
+              <input
+                type="checkbox"
+                checked={sumSameKupa}
+                onChange={e => onSumSameKupaChange(e.target.checked)}
+              />
+              <span className="kupa-toggle-slider" />
+            </label>
+          </div>
+        </div>
+
         {/* ── Analyze ── */}
         <div className="analyze-wrap">
           <button
@@ -482,7 +669,7 @@ function LoadingScreen({ step, progress }) {
 
 // ─── Fund Results Section ─────────────────────────────────────────────────────
 
-function FundResults({ data, weights }) {
+function FundResults({ data, weights, thresholds }) {
   const { client, alternatives, golden: gold } = data;
   const isNew = client.grade === 0;
 
@@ -501,6 +688,7 @@ function FundResults({ data, weights }) {
   // Risk display
   const riskLabel = RISK_LABELS[client.risk_level] ?? client.risk_level ?? '—';
   const riskColor = RISK_COLORS[client.risk_level] ?? '#94A3B8';
+  const riskExposure = getRiskExposure(thresholds ?? DEFAULT_THRESHOLDS);
 
   // Merge client + alternatives, sort by AmoScore descending
   const clientEntry = {
@@ -539,12 +727,12 @@ function FundResults({ data, weights }) {
             <span
               className="risk-pill"
               style={{ background: `${riskColor}22`, color: riskColor, borderColor: `${riskColor}55` }}
-              title={RISK_EXPOSURE[client.risk_level]}
+              title={riskExposure[client.risk_level]}
             >
               ● רמת סיכון {riskLabel}
               {client.risk_level && (
                 <span style={{ fontSize: '10px', opacity: 0.8, marginRight: '6px', fontWeight: 400 }}>
-                  ({RISK_EXPOSURE[client.risk_level]})
+                  ({riskExposure[client.risk_level]})
                 </span>
               )}
             </span>
@@ -1212,7 +1400,7 @@ function SummaryHero({ results }) {
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
-function ResultsScreen({ results, weights, onReset }) {
+function ResultsScreen({ results, weights, thresholds, onReset }) {
   const [selectedId, setSelectedId] = useState('all');
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -1270,7 +1458,7 @@ function ResultsScreen({ results, weights, onReset }) {
 
         {filtered.map((data, i) => (
           <div key={(data.client?.id ?? i) + '-' + i}>
-            <FundResults data={data} weights={weights} />
+            <FundResults data={data} weights={weights} thresholds={thresholds} />
           </div>
         ))}
 
@@ -1294,10 +1482,17 @@ function App() {
   const [screen, setScreen] = useState('upload');
   const [mislakaFiles, setMislakaFiles] = useState([]);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
-  const [results, setResults] = useState(null);
+  const [rawResults, setRawResults] = useState(null);
+  const [sumSameKupa, setSumSameKupa] = useState(false);
+  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [viewingFile, setViewingFile] = useState(null);
+
+  const results = useMemo(() => {
+    if (!rawResults) return null;
+    return sumSameKupa ? aggregateResults(rawResults) : rawResults;
+  }, [rawResults, sumSameKupa]);
 
   const handleRemoveMislakaFile = (idx) => {
     setMislakaFiles(prev => prev.filter((_, i) => i !== idx));
@@ -1379,6 +1574,9 @@ function App() {
       formData.append('weight_3', weights.w3);
       formData.append('weight_5', weights.w5);
       formData.append('weight_sharp', weights.wSharp);
+      formData.append('low_exposure_threshold', thresholds.low);
+      formData.append('medium_exposure_threshold', thresholds.medium);
+      formData.append('client_id', 'amo_sight_user');
       mislakaFiles.forEach(f => formData.append('mislaka_file', f));
 
       const res = await fetch('http://localhost:8000/compare', {
@@ -1392,7 +1590,7 @@ function App() {
       setProgress(100);
       setTimeout(() => {
         const funds = data.funds ?? data;
-        setResults(Array.isArray(funds) ? funds : [funds]);
+        setRawResults(Array.isArray(funds) ? funds : [funds]);
         setScreen('results');
       }, 500);
     } catch (err) {
@@ -1407,7 +1605,7 @@ function App() {
     return <LoadingScreen step={loadingStep} progress={progress} />;
   }
   if (screen === 'results') {
-    return <ResultsScreen results={results} weights={weights} onReset={() => setScreen('upload')} />;
+    return <ResultsScreen results={results} weights={weights} thresholds={thresholds} onReset={() => setScreen('upload')} />;
   }
   if (screen === 'viewer' && viewingFile) {
     return (
@@ -1432,6 +1630,10 @@ function App() {
       onViewFile={handleViewFile}
       weights={weights}
       onWeightsChange={setWeights}
+      thresholds={thresholds}
+      onThresholdsChange={setThresholds}
+      sumSameKupa={sumSameKupa}
+      onSumSameKupaChange={setSumSameKupa}
       onAnalyze={handleAnalyze}
     />
   );

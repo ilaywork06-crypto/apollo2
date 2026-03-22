@@ -30,6 +30,8 @@ async def compare(
     weight_1: int = Form(),
     weight_3: int = Form(),
     weight_5: int = Form(),
+    low_exposure_threshold: int = Form(),
+    medium_exposure_threshold: int = Form(),
     weight_sharp: int = Form(),
     mislaka_file: list[UploadFile] = File(...),
 ) -> dict:
@@ -55,6 +57,8 @@ async def compare(
         weight_3=weight_3,
         weight_5=weight_5,
         weight_sharp=weight_sharp,
+        low_exposure_threshold=low_exposure_threshold,
+        medium_exposure_threshold=medium_exposure_threshold,
     )
     return content
 

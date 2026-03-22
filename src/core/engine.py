@@ -18,7 +18,6 @@ RISKS_MAP_PATH = _DATA_DIR / "risks_map.xml"
 
 # Parse static data once at startup
 risk_classifier.load(RISKS_MAP_PATH)
-_KUPOT_LIST = parse_xml_file(GEMEL_NET_PATH)
 
 # ----- Functions ----- #
 
@@ -246,6 +245,8 @@ def run_comparison(
     weight_3: int,
     weight_5: int,
     weight_sharp: int,
+    low_exposure_threshold: float,
+    medium_exposure_threshold: float,
 ) -> dict:
     """Orchestrate the full fund comparison for all holdings in the Mislaka files.
 
@@ -268,13 +269,14 @@ def run_comparison(
         A dict with a ``funds`` key containing a list of per-holding result
         dicts, each with ``client``, ``alternatives``, and ``golden`` keys.
     """
+    koput_list = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold)
     mislaka_list = parse_multible_mislaka_files(mislaka_file)
-    matches = find_matching_kupot(mislaka_list, _KUPOT_LIST)
+    matches = find_matching_kupot(mislaka_list, koput_list)
     funds_list = []
 
     for mislaka, kupa in matches:
         sug = kupa["SUG"]
-        our_koput = [k for k in _KUPOT_LIST if k["SUG"] == sug]
+        our_koput = [k for k in koput_list if k["SUG"] == sug]
         risk_level = kupa["risk_level"]
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
 

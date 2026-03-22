@@ -19,13 +19,13 @@ def load(path: Path) -> None:
     _risks.update(parse_risk_map(path))
 
 
-def get_risk_level(kupa_id: int) -> str:
+def get_risk_level(kupa_id: int, low_exposure_threshold: int, medium_exposure_threshold: int) -> str:
     """Return the risk-level label for a kupa based on its equity exposure.
 
     Risk bands:
-    * ``"low"``    — equity exposure ≤ 24.9999 %
-    * ``"medium"`` — equity exposure ≤ 74.9999 %
-    * ``"high"``   — equity exposure > 74.9999 %
+    * ``"low"``    — equity exposure ≤ 25 %
+    * ``"medium"`` — equity exposure ≤ 75 %
+    * ``"high"``   — equity exposure > 75 %
     * ``"invalid"`` — kupa ID not found in the risk map
 
     Args:
@@ -37,9 +37,9 @@ def get_risk_level(kupa_id: int) -> str:
     if kupa_id not in _risks:
         return "invalid"
     pct = _risks[kupa_id]
-    if pct <= 24.9999:
+    if pct <= low_exposure_threshold:
         return "low"
-    elif pct <= 74.9999:
+    elif pct <= medium_exposure_threshold:
         return "medium"
     else:
         return "high"

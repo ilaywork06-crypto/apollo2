@@ -11,7 +11,7 @@ from src.parsers.xml_utils import extract_data_from_xml
 # ----- Functions ----- #
 
 
-def parse_xml_file(content: Path) -> list[dict]:
+def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int) -> list[dict]:
     """Parse the GemeNet kupot XML file and return a list of kupa records.
 
     Only rows whose ``UCHLUSIYAT_YAAD`` field equals ``"כלל האוכלוסיה"``
@@ -20,6 +20,8 @@ def parse_xml_file(content: Path) -> list[dict]:
 
     Args:
         content: Path to the GemeNet XML file to parse.
+        low_exposure_threshold: The threshold for low equity exposure.
+        medium_exposure_threshold: The threshold for medium equity exposure.
 
     Returns:
         A list of dicts, each representing one kupa with the following keys:
@@ -52,7 +54,7 @@ def parse_xml_file(content: Path) -> list[dict]:
             row,
             float,
         )
-        RISK_LEVEL = get_risk_level(int(ID))
+        RISK_LEVEL = get_risk_level(int(ID), low_exposure_threshold, medium_exposure_threshold)
         TSUA_MITZTABERET_LETKUFA = extract_data_from_xml(
             "TSUA_MITZTABERET_LETKUFA",
             row,
