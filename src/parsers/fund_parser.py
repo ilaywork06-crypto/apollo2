@@ -20,7 +20,14 @@ def remove_bad_hevrot(list_of_kupot: list[dict]) -> list[dict]:
         A filtered list of kupa dicts, excluding those whose ``hevra`` value
         is in the predefined set of bad company names.
     """
-    bad_hevrot = {'אינפיניטי השתלמות, גמל ופנסיה בע"מ'}
+    bad_hevrot = {
+        'אינפיניטי השתלמות, גמל ופנסיה בע"מ',
+        'גלובלנט ניהול קופות גמל בע"מ',
+        'סלייס גמל בע"מ',
+        'אקטיון בע"מ',
+        'קרן מקפת מרכז לפנסיה ותגמולים אגודה שיתופית בע"מ',
+        'מבטחים מוסד לביטוח סוציאלי של העובדים בע"מ'    
+        }
     return [kupa for kupa in list_of_kupot if kupa["hevra"] not in bad_hevrot]
 
 def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int) -> list[dict]:
