@@ -247,6 +247,7 @@ def run_comparison(
     weight_sharp: int,
     low_exposure_threshold: float,
     medium_exposure_threshold: float,
+    bad_hevrot: list[str],
 ) -> dict:
     """Orchestrate the full fund comparison for all holdings in the Mislaka files.
 
@@ -269,7 +270,7 @@ def run_comparison(
         A dict with a ``funds`` key containing a list of per-holding result
         dicts, each with ``client``, ``alternatives``, and ``golden`` keys.
     """
-    koput_list = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold)
+    koput_list = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, bad_hevrot)
     mislaka_list = parse_multible_mislaka_files(mislaka_file)
     matches = find_matching_kupot(mislaka_list, koput_list)
     funds_list = []

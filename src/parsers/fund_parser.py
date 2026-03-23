@@ -10,27 +10,21 @@ from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
 
-def remove_bad_hevrot(list_of_kupot: list[dict]) -> list[dict]:
+def remove_bad_hevrot(list_of_kupot: list[dict], bad_hevrot: list[str]) -> list[dict]:
     """Remove records with invalid or excluded company names.
 
     Args:
         list_of_kupot: A list of kupa dicts, each containing a ``hevra`` key.
+        bad_hevrot: A set of company names to exclude.
 
     Returns:
         A filtered list of kupa dicts, excluding those whose ``hevra`` value
         is in the predefined set of bad company names.
     """
-    bad_hevrot = {
-        'אינפיניטי השתלמות, גמל ופנסיה בע"מ',
-        'גלובלנט ניהול קופות גמל בע"מ',
-        'סלייס גמל בע"מ',
-        'אקטיון בע"מ',
-        'קרן מקפת מרכז לפנסיה ותגמולים אגודה שיתופית בע"מ',
-        'מבטחים מוסד לביטוח סוציאלי של העובדים בע"מ'    
-        }
+    print(bad_hevrot)
     return [kupa for kupa in list_of_kupot if kupa["hevra"] not in bad_hevrot]
 
-def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int) -> list[dict]:
+def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int, bad_hevrot: list[str]) -> list[dict]:
     """Parse the GemeNet kupot XML file and return a list of kupa records.
 
     Only rows whose ``UCHLUSIYAT_YAAD`` field equals ``"כלל האוכלוסיה"``
@@ -101,4 +95,4 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
             }
         )
         
-    return remove_bad_hevrot(list_of_kupot)
+    return remove_bad_hevrot(list_of_kupot, bad_hevrot)

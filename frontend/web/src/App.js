@@ -30,6 +30,34 @@ const getRiskExposure = (thresholds) => ({
 
 const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 45 };
 
+const ALL_HEVROT = [
+  'מיטב גמל ופנסיה בע"מ',
+  'אלטשולר שחם גמל ופנסיה בע"מ',
+  'הראל פנסיה וגמל בע"מ',
+  'גלובלנט ניהול קופות גמל בע"מ',
+  'אינפיניטי השתלמות, גמל ופנסיה בע"מ',
+  'מנורה מבטחים פנסיה וגמל בע"מ',
+  'מגדל מקפת קרנות פנסיה וקופות גמל בע"מ',
+  'סלייס גמל בע"מ',
+  'אקטיון בע"מ',
+  'ילין לפידות ניהול קופות גמל בע"מ',
+  'מור גמל ופנסיה בע"מ',
+  'כלל פנסיה וגמל בע"מ',
+  'קרן מקפת מרכז לפנסיה ותגמולים אגודה שיתופית בע"מ',
+  'מבטחים מוסד לביטוח סוציאלי של העובדים בע"מ',
+  'אנליסט קופות גמל בע"מ',
+  'הפניקס פנסיה וגמל בע"מ',
+];
+
+const DEFAULT_BAD_HEVROT = new Set([
+  'אינפיניטי השתלמות, גמל ופנסיה בע"מ',
+  'גלובלנט ניהול קופות גמל בע"מ',
+  'סלייס גמל בע"מ',
+  'אקטיון בע"מ',
+  'קרן מקפת מרכז לפנסיה ותגמולים אגודה שיתופית בע"מ',
+  'מבטחים מוסד לביטוח סוציאלי של העובדים בע"מ',
+]);
+
 const WEIGHT_FIELDS = [
   { field: 'w1',     label: 'תשואה שנה' },
   { field: 'w3',     label: 'תשואה 3 שנים' },
@@ -502,9 +530,56 @@ function RiskBandEditor({ low, medium, onChange }) {
   );
 }
 
+// ─── Hevrot Checklist ─────────────────────────────────────────────────────────
+
+function HevrotChecklist({ badHevrot, onChange }) {
+  const allChecked = ALL_HEVROT.every(h => !badHevrot.has(h));
+  const noneChecked = ALL_HEVROT.every(h => badHevrot.has(h));
+
+  const toggle = (h) => {
+    const next = new Set(badHevrot);
+    if (next.has(h)) next.delete(h);
+    else next.add(h);
+    onChange(next);
+  };
+
+  const toggleAll = () => {
+    if (allChecked) onChange(new Set(ALL_HEVROT));
+    else onChange(new Set());
+  };
+
+  return (
+    <div className="hevrot-checklist">
+      <div className="hevrot-toggle-all">
+        <label className="hevrot-item">
+          <input
+            type="checkbox"
+            checked={allChecked}
+            ref={el => { if (el) el.indeterminate = !allChecked && !noneChecked; }}
+            onChange={toggleAll}
+          />
+          <span className="hevrot-name hevrot-name--all">בחר / בטל הכל</span>
+        </label>
+      </div>
+      <div className="hevrot-grid">
+        {ALL_HEVROT.map(h => (
+          <label key={h} className="hevrot-item">
+            <input
+              type="checkbox"
+              checked={!badHevrot.has(h)}
+              onChange={() => toggle(h)}
+            />
+            <span className="hevrot-name">{h}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameKupa, onSumSameKupaChange, onAnalyze }) {
+function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameKupa, onSumSameKupaChange, badHevrot, onBadHevrotChange, onAnalyze }) {
   const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
   const ready = mislakaFiles.length > 0 && sum === 100;
   const hasFiles = mislakaFiles.length > 0;
@@ -624,6 +699,18 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
               <span className="kupa-toggle-slider" />
             </label>
           </div>
+        </div>
+
+        {/* ── Step 5: Hevrot ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header">
+            <div className="step-card-num">05</div>
+            <div className="step-card-label">בחירת חברות מנהלות</div>
+            <button className="quick-action-btn quick-action-btn--reset" onClick={() => onBadHevrotChange(new Set(DEFAULT_BAD_HEVROT))}>
+              ↺ איפוס
+            </button>
+          </div>
+          <HevrotChecklist badHevrot={badHevrot} onChange={onBadHevrotChange} />
         </div>
 
         {/* ── Analyze ── */}
@@ -972,29 +1059,7 @@ function FundResults({ data, weights, thresholds }) {
         )}
       </div>
 
-      {/* 7 ─ AmoScore Explanation */}
-      <div className="amoscore-explanation">
-        <div className="amoscore-explanation-header">
-          <span className="amoscore-explanation-icon">📐</span>
-          <div className="amoscore-explanation-title">כיצד מחושב AmoScore?</div>
-        </div>
-        <div className="amoscore-explanation-body">
-          <p>AmoScore מחושב על בסיס 4 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, ו-Sharp Ratio.</p>
-          <p>כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה. לאחר מכן כל פרמטר מוכפל במשקל שנבחר, והציון הסופי הוא הסכום המשוקלל של כל הפרמטרים.</p>
-          {weights && (
-            <div className="amoscore-weights-chips">
-              {[['תשואה שנה', weights.w1], ['תשואה 3 שנים', weights.w3], ['תשואה 5 שנים', weights.w5], ['Sharp Ratio', weights.wSharp]].map(([label, val]) => (
-                <div key={label} className="weight-chip">
-                  <div className="weight-chip-label">{label}</div>
-                  <div className="weight-chip-val">{val}%</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 8 ─ Disclaimer */}
+      {/* 7 ─ Disclaimer */}
       <div className="disclaimer">
         הנתונים מבוססים על מידע מהמסלקה הפנסיונית ומגמל נט של רשות שוק ההון · אין לראות בכך ייעוץ השקעות
       </div>
@@ -1462,6 +1527,31 @@ function ResultsScreen({ results, weights, thresholds, onReset }) {
           </div>
         ))}
 
+        <div className="amoscore-explanation">
+          <div className="amoscore-explanation-header">
+            <span className="amoscore-explanation-icon">📐</span>
+            <div className="amoscore-explanation-title">כיצד מחושב AmoScore?</div>
+          </div>
+          <div className="amoscore-explanation-body">
+            <p>
+              AmoScore הוא ציון מורכב המשקלל ארבעה פרמטרים של ביצועי קופת הגמל: תשואה לשנה, תשואה ל-3 שנים, תשואה ל-5 שנים, ו-Sharp Ratio — מדד לתשואה מתואמת סיכון.
+            </p>
+            <p>
+              כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה, כך שהקופה הטובה ביותר בכל פרמטר מקבלת 100 והחלשה ביותר מקבלת 0. לאחר מכן כל פרמטר מוכפל במשקל שבחרת, והציון הסופי הוא הסכום המשוקלל — מספר בין 0 ל-100 שמאפשר השוואה ישירה בין קופות.
+            </p>
+            {weights && (
+              <div className="amoscore-weights-chips">
+                {[['תשואה שנה', weights.w1], ['תשואה 3 שנים', weights.w3], ['תשואה 5 שנים', weights.w5], ['Sharp Ratio', weights.wSharp]].map(([label, val]) => (
+                  <div key={label} className="weight-chip">
+                    <div className="weight-chip-label">{label}</div>
+                    <div className="weight-chip-val">{val}%</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="pdf-button-container">
           <button
             className="download-pdf-btn"
@@ -1471,6 +1561,14 @@ function ResultsScreen({ results, weights, thresholds, onReset }) {
             {pdfLoading ? '⏳ מפיק PDF...' : '📥 הורד דוח PDF'}
           </button>
         </div>
+
+        <div className="portfolio-footer">
+          נבנה ב ❤️ על ידי{' '}
+          <a href="https://techiloli.vercel.app/" target="_blank" rel="noopener noreferrer">
+            Ilay Atia
+          </a>
+        </div>
+
       </div>
     </div>
   );
@@ -1485,6 +1583,7 @@ function App() {
   const [rawResults, setRawResults] = useState(null);
   const [sumSameKupa, setSumSameKupa] = useState(false);
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
+  const [badHevrot, setBadHevrot] = useState(DEFAULT_BAD_HEVROT);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [viewingFile, setViewingFile] = useState(null);
@@ -1578,6 +1677,7 @@ function App() {
       formData.append('medium_exposure_threshold', thresholds.medium);
       formData.append('client_id', 'amo_sight_user');
       mislakaFiles.forEach(f => formData.append('mislaka_file', f));
+      badHevrot.forEach(h => formData.append('bad_hevrot', h));
 
       const res = await fetch('http://localhost:8000/compare', {
         method: 'POST',
@@ -1634,6 +1734,8 @@ function App() {
       onThresholdsChange={setThresholds}
       sumSameKupa={sumSameKupa}
       onSumSameKupaChange={setSumSameKupa}
+      badHevrot={badHevrot}
+      onBadHevrotChange={setBadHevrot}
       onAnalyze={handleAnalyze}
     />
   );

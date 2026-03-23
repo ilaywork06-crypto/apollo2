@@ -34,6 +34,7 @@ async def compare(
     medium_exposure_threshold: int = Form(),
     weight_sharp: int = Form(),
     mislaka_file: list[UploadFile] = File(...),
+    bad_hevrot: list[str] = Form([]),
 ) -> dict:
     """Run a fund comparison based on uploaded Mislaka files and user-supplied weights.
 
@@ -59,6 +60,7 @@ async def compare(
         weight_sharp=weight_sharp,
         low_exposure_threshold=low_exposure_threshold,
         medium_exposure_threshold=medium_exposure_threshold,
+        bad_hevrot=bad_hevrot,
     )
     return content
 
