@@ -584,6 +584,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
   const ready = mislakaFiles.length > 0 && sum === 100;
   const hasFiles = mislakaFiles.length > 0;
   const isDefaultWeights = weights.w1 === DEFAULT_WEIGHTS.w1 && weights.w3 === DEFAULT_WEIGHTS.w3 && weights.w5 === DEFAULT_WEIGHTS.w5 && weights.wSharp === DEFAULT_WEIGHTS.wSharp;
+  const [hevrotOpen, setHevrotOpen] = useState(false);
 
   return (
     <div className="screen screen--upload">
@@ -703,14 +704,19 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 
         {/* ── Step 5: Hevrot ── */}
         <div className="upload-step-card">
-          <div className="step-card-header">
+          <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setHevrotOpen(o => !o)}>
             <div className="step-card-num">05</div>
             <div className="step-card-label">בחירת חברות מנהלות</div>
-            <button className="quick-action-btn quick-action-btn--reset" onClick={() => onBadHevrotChange(new Set(DEFAULT_BAD_HEVROT))}>
-              ↺ איפוס
-            </button>
+            <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
+              {hevrotOpen ? '▲ סגור' : '▼ פתח'}
+            </span>
+            {hevrotOpen && (
+              <button className="quick-action-btn quick-action-btn--reset" onClick={e => { e.stopPropagation(); onBadHevrotChange(new Set(DEFAULT_BAD_HEVROT)); }}>
+                ↺ איפוס
+              </button>
+            )}
           </div>
-          <HevrotChecklist badHevrot={badHevrot} onChange={onBadHevrotChange} />
+          {hevrotOpen && <HevrotChecklist badHevrot={badHevrot} onChange={onBadHevrotChange} />}
         </div>
 
         {/* ── Analyze ── */}
