@@ -21,7 +21,6 @@ def remove_bad_hevrot(list_of_kupot: list[dict], bad_hevrot: list[str]) -> list[
         A filtered list of kupa dicts, excluding those whose ``hevra`` value
         is in the predefined set of bad company names.
     """
-    print(bad_hevrot)
     return [kupa for kupa in list_of_kupot if kupa["hevra"] not in bad_hevrot]
 
 def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int, bad_hevrot: list[str]) -> list[dict]:

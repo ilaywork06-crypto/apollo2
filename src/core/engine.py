@@ -138,22 +138,22 @@ def calculate_grade(
     weights = {}
 
     if kupa.get("tsua_mitztaberet_letkufa_normalized") != 0.0:
-        if kupa.get("tsua_3_normalized") != 0.0:
-            if kupa.get("tsua_5_normalized") != 0.0:
-                if kupa.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
-                    weights["tsua_mitztaberet_letkufa_normalized"] = weight_1
-                    weights["sharp_ribit_hasarot_sikun_normalized"] = weight_sharp
-                    weights["tsua_5_normalized"] = weight_5
-                    weights["tsua_3_normalized"] = weight_3
+        weights["tsua_mitztaberet_letkufa_normalized"] = weight_1
+    if kupa.get("tsua_3_normalized") != 0.0:
+        weights["tsua_3_normalized"] = weight_3
+    if kupa.get("tsua_5_normalized") != 0.0:
+        weights["tsua_5_normalized"] = weight_5
+    if kupa.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
+        weights["sharp_ribit_hasarot_sikun_normalized"] = weight_sharp
 
-    if not weights or len(weights) != 4:
+    if not weights:
         return 0
-
     total_weight = sum(weights.values())
+    if total_weight != 100:
+        return 0
     grade = 0
     for field, weight in weights.items():
         grade += kupa[field] * (weight / total_weight)
-
     return round(grade, 2)
 
 
