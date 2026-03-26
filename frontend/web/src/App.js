@@ -1609,8 +1609,19 @@ function LeaderboardScreen({ leaderboard, myProfile, onViewProfile, onBack }) {
   const [sortBy, setSortBy] = useState('score');
   const [riskFilter, setRiskFilter] = useState('all');
 
+  const exposureToRisk = (exposure) => {
+    if (exposure == null) return null;
+    if (exposure <= 25) return 'low';
+    if (exposure <= 75) return 'medium';
+    return 'high';
+  };
+
   const filtered = (leaderboard || [])
-    .filter(p => riskFilter === 'all' || p.dominant_risk === riskFilter)
+    .filter(p => {
+      if (riskFilter === 'all') return true;
+      const risk = exposureToRisk(p.weighted_equity_exposure) ?? p.dominant_risk;
+      return risk === riskFilter;
+    })
     .slice()
     .sort((a, b) =>
       sortBy === 'score'
