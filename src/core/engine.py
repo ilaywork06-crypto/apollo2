@@ -295,6 +295,7 @@ def run_comparison(
         client = {
             "name": client_kupa["shem_kupa"],
             "id": client_kupa["ID"],
+            "client_id": mislaka.get("MISPAR-ZIHUY-LAKOACH", "unknown"),
             "grade": client_kupa["grade"],
             "rank": client_ranking,
             "total_in_risk": total_kupot,
@@ -307,6 +308,7 @@ def run_comparison(
             "hevra": client_kupa["hevra"],
             "seniority_date": mislaka["TAARICH-HITZTARFUT-MUTZAR"],
             "percentile": round((total_kupot - client_ranking) / total_kupot * 100),
+            "equity_exposure": client_kupa.get("equity_exposure"),
         }
 
         golden = {}

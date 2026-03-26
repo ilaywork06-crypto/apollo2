@@ -77,9 +77,24 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
     dmey_nihul_tsvira_map = _map_dmey_nihul(root, 1)
     dmey_nihul_hafkada_map = _map_dmey_nihul(root, 2)
 
+    # Extract client ID at file level (same for all records in this file)
+    mispar_zihuy_file = "unknown"
+    for lakoach in root.iter("YeshutLakoach"):
+        val = extract_data_from_xml(".//MISPAR-ZIHUY-LAKOACH", lakoach)
+        if val and val != "N/A":
+            mispar_zihuy_file = val
+        break
+
     list_of_kupot = []
     for row in root.iter("Mutzar"):
         KOD_MEZAHE_YATZRAN = extract_data_from_xml(".//KOD-MEZAHE-YATZRAN", row)
+        # Try per-Mutzar YeshutLakoach first, fall back to file-level
+        mispar_zihuy = mispar_zihuy_file
+        for lakoach in row.iter("YeshutLakoach"):
+            val = extract_data_from_xml(".//MISPAR-ZIHUY-LAKOACH", lakoach)
+            if val and val != "N/A":
+                mispar_zihuy = val
+            break
         for polisa in row.iter("HeshbonOPolisa"):
             SHEM_TOCHNIT = extract_data_from_xml(".//SHEM-TOCHNIT", polisa)
             TAARICH_HITZTARFUT_MUTZAR = extract_data_from_xml(
@@ -122,6 +137,7 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                         "SHEUR-DMEI-NIHUL-TZVIRA": FINAL_DMEI_NIHUL_TZVIRA,
                         "SHEUR-DMEI-NIHUL-HAFKADA": FINAL_DMEI_NIHUL_HAFKADA,
                         "KOD-MEZAHE-YATZRAN": KOD_MEZAHE_YATZRAN.strip(),
+                        "MISPAR-ZIHUY-LAKOACH": mispar_zihuy,
                     }
                 )
     return list_of_kupot

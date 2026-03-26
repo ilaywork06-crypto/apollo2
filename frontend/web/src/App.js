@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import './App.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -22,6 +22,17 @@ const ALT_GRADIENTS = [
 
 const RISK_LABELS = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה' };
 const RISK_COLORS = { low: '#10B981', medium: '#3B82F6', high: '#F59E0B' };
+
+const COMMUNITY_RISK_COLORS = { high: '#EF4444', medium: '#F59E0B', low: '#10B981' };
+const ANIMAL_EMOJIS = {
+  'נשר': '🦅', 'דולפין': '🐬', 'אריה': '🦁', 'פנתר': '🐆',
+  'זאב': '🐺', 'נמר': '🐯', 'עיט': '🦅', 'ינשוף': '🦉',
+  'שועל': '🦊', 'דרקון': '🐉', 'נץ': '🦅', 'פלמינגו': '🦩',
+  'דוב': '🐻', 'טיגריס': '🐅', 'חתול': '🐱',
+};
+const FUND_PALETTE = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899'];
+const getCommunityAvatar = name => ANIMAL_EMOJIS[name?.split(' ')[0]] || '🦁';
+const MEDALS = ['🥇', '🥈', '🥉'];
 const getRiskExposure = (thresholds) => ({
   low:    `0–${thresholds.low}% חשיפה למניות`,
   medium: `${thresholds.low}–${thresholds.medium}% חשיפה למניות`,
@@ -1469,9 +1480,361 @@ function SummaryHero({ results }) {
   );
 }
 
+// ─── Community: Invite Screen ─────────────────────────────────────────────────
+
+function InviteScreen({ results, onJoined, onBack }) {
+  const [joining, setJoining] = useState(false);
+
+  const totalAmount = (results || []).reduce((s, f) => s + (f.client?.amount ?? 0), 0);
+  const weightedTsua = totalAmount > 0
+    ? (results || []).reduce((s, f) => s + (f.client?.tsua_1 ?? 0) * (f.client?.amount ?? 0) / totalAmount, 0)
+    : 0;
+  const weightedScore = totalAmount > 0
+    ? (results || []).filter(f => (f.client?.grade ?? 0) > 0)
+        .reduce((s, f) => s + (f.client?.grade ?? 0) * (f.client?.amount ?? 0) / totalAmount, 0)
+    : 0;
+  const fundsWithExposure = (results || []).filter(f => f.client?.equity_exposure != null);
+  const exposureWeightTotal = fundsWithExposure.reduce((s, f) => s + (f.client?.amount ?? 0), 0);
+  const weightedExposure = exposureWeightTotal > 0
+    ? fundsWithExposure.reduce((s, f) => s + (f.client.equity_exposure * (f.client?.amount ?? 0)), 0) / exposureWeightTotal
+    : null;
+
+  const handleJoin = async () => {
+    setJoining(true);
+    try {
+      const clientId = results?.[0]?.client?.client_id || 'unknown';
+      const joinData = {
+        client_id: clientId,
+        funds: (results || []).map(f => ({
+          name: f.client?.name || '',
+          id: f.client?.id || '',
+          risk_level: f.client?.risk_level || 'high',
+          tsua_1: f.client?.tsua_1 ?? 0,
+          grade: f.client?.grade ?? 0,
+          amount: f.client?.amount ?? 0,
+          equity_exposure: f.client?.equity_exposure ?? null,
+          pct_of_total: totalAmount > 0
+            ? Math.round((f.client?.amount ?? 0) / totalAmount * 1000) / 10
+            : 0,
+        })),
+      };
+      const res = await fetch('http://localhost:8000/community/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(joinData),
+      });
+      const data = await res.json();
+      onJoined(data.profile);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה בהצטרפות לקהילה. אנא בדוק שהשרת פועל ונסה שוב.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  return (
+    <div className="screen community-screen">
+      <Stars />
+      <Header onReset={onBack} />
+      <div className="community-content">
+        <button className="back-btn community-back" onClick={onBack}>→ חזרה לתוצאות</button>
+
+        <div className="community-invite-hero">
+          <div className="community-trophy">🏆</div>
+          <h1 className="community-title">הצטרף לקהילת המשקיעים</h1>
+          <p className="community-subtitle">
+            גלה איך הפורטפוליו שלך ביחס למשקיעים אחרים — בצורה אנונימית לחלוטין.<br />
+            הפרופיל שלך יוצג עם שם בדוי בלבד. אף אחד לא יידע מי אתה.
+          </p>
+        </div>
+
+        <div className="community-invite-grid">
+          <div className="community-card community-preview-card">
+            <div className="community-card-label">כך ייראה הפרופיל שלך</div>
+            <div className="community-preview-header">
+              <div className="community-avatar-sm">🦁</div>
+              <div>
+                <div className="community-preview-name">משקיע מסתורי</div>
+                <div className="community-preview-date">
+                  הצטרף {new Date().toLocaleDateString('he-IL', { month: '2-digit', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
+            <div className="community-preview-stats">
+              <div className="community-stat-mini">
+                <div className="community-stat-mini-val" style={{ color: '#3B82F6' }}>{fmtDec(weightedScore)}</div>
+                <div className="community-stat-mini-label">AmoScore</div>
+              </div>
+              <div className="community-stat-mini">
+                <div className="community-stat-mini-val" style={{ color: '#10B981' }}>{fmtDec(weightedTsua)}%</div>
+                <div className="community-stat-mini-label">תשואה שנתית</div>
+              </div>
+              <div className="community-stat-mini">
+                <div className="community-stat-mini-val" style={{ color: '#F59E0B' }}>
+                  {weightedExposure != null ? `${fmtDec(weightedExposure)}%` : '—'}
+                </div>
+                <div className="community-stat-mini-label">חשיפה למניות</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="community-card community-privacy-card">
+            <div className="community-card-label">מה מוצג בפרופיל?</div>
+            <ul className="community-privacy-list">
+              <li className="privacy-item privacy-yes">✓ אחוז מהתיק לכל קופה</li>
+              <li className="privacy-item privacy-yes">✓ תשואה שנתית משוקללת</li>
+              <li className="privacy-item privacy-yes">✓ ציון AmoScore</li>
+              <li className="privacy-item privacy-yes">✓ רמת סיכון דומיננטית</li>
+              <li className="privacy-item privacy-no">✗ שם אמיתי — לעולם לא</li>
+              <li className="privacy-item privacy-no">✗ סכומים בשקלים — לעולם לא</li>
+            </ul>
+          </div>
+        </div>
+
+        <button className="community-join-btn" onClick={handleJoin} disabled={joining}>
+          {joining ? '⏳ מצטרף...' : '🚀 הצטרף לקהילה'}
+        </button>
+        <p className="community-disclaimer-small">
+          ניתן לעזוב בכל עת · המידע שלך מאוחסן באופן מקומי בלבד
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Community: Leaderboard Screen ────────────────────────────────────────────
+
+function LeaderboardScreen({ leaderboard, myProfile, onViewProfile, onBack }) {
+  const [sortBy, setSortBy] = useState('score');
+  const [riskFilter, setRiskFilter] = useState('all');
+
+  const filtered = (leaderboard || [])
+    .filter(p => riskFilter === 'all' || p.dominant_risk === riskFilter)
+    .slice()
+    .sort((a, b) =>
+      sortBy === 'score'
+        ? b.weighted_score - a.weighted_score
+        : b.weighted_tsua - a.weighted_tsua
+    );
+
+  return (
+    <div className="screen community-screen">
+      <Stars />
+      <Header onReset={onBack} />
+      <div className="community-content">
+        <button className="back-btn community-back" onClick={onBack}>→ חזרה לתוצאות</button>
+
+        <div className="leaderboard-hero">
+          <h1 className="community-title">🏆 טבלת המשקיעים</h1>
+          <div className="leaderboard-count">{(leaderboard || []).length} משקיעים בקהילה</div>
+        </div>
+
+        <div className="leaderboard-controls">
+          <div className="leaderboard-sort-group">
+            <span className="leaderboard-control-label">מיין לפי:</span>
+            <button
+              className={`leaderboard-filter-btn${sortBy === 'score' ? ' active' : ''}`}
+              onClick={() => setSortBy('score')}
+            >AmoScore</button>
+            <button
+              className={`leaderboard-filter-btn${sortBy === 'tsua' ? ' active' : ''}`}
+              onClick={() => setSortBy('tsua')}
+            >תשואה שנתית</button>
+          </div>
+          <div className="leaderboard-risk-group">
+            <span className="leaderboard-control-label">סיכון:</span>
+            {['all', 'high', 'medium', 'low'].map(risk => (
+              <button
+                key={risk}
+                className={`leaderboard-filter-btn${riskFilter === risk ? ' active' : ''}`}
+                onClick={() => setRiskFilter(risk)}
+                style={riskFilter === risk && risk !== 'all'
+                  ? { borderColor: COMMUNITY_RISK_COLORS[risk], color: COMMUNITY_RISK_COLORS[risk] }
+                  : {}}
+              >
+                {risk === 'all' ? 'הכל' : RISK_LABELS[risk]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="leaderboard-table-wrap">
+          <div className="leaderboard-table">
+            <div className="leaderboard-header-row">
+              <div className="lb-col lb-col-rank">#</div>
+              <div className="lb-col lb-col-investor">משקיע</div>
+              <div className="lb-col lb-col-score">AmoScore</div>
+              <div className="lb-col lb-col-tsua">תשואה</div>
+              <div className="lb-col lb-col-risk">חשיפה</div>
+            </div>
+            {filtered.map((profile, idx) => {
+              const isMe = myProfile && profile.fake_name === myProfile.fake_name;
+              return (
+                <div
+                  key={profile.fake_name}
+                  className={`leaderboard-row${isMe ? ' leaderboard-row--me' : ''}${idx < 3 ? ` leaderboard-row--top${idx + 1}` : ''}`}
+                  onClick={() => onViewProfile(profile.fake_name)}
+                >
+                  <div className="lb-col lb-col-rank">
+                    {idx < 3 ? MEDALS[idx] : <span className="lb-rank-num">{idx + 1}</span>}
+                  </div>
+                  <div className="lb-col lb-col-investor">
+                    <div className="lb-avatar">{getCommunityAvatar(profile.fake_name)}</div>
+                    <div className="lb-investor-info">
+                      <div className="lb-name">
+                        {profile.fake_name}
+                        {isMe && <span className="lb-me-badge">אתה</span>}
+                      </div>
+                      <div className="lb-meta">{profile.num_funds} קופות · {profile.joined}</div>
+                    </div>
+                  </div>
+                  <div className="lb-col lb-col-score">
+                    <span style={{ color: '#3B82F6', fontWeight: 700 }}>{fmtDec(profile.weighted_score)}</span>
+                  </div>
+                  <div className="lb-col lb-col-tsua">
+                    <span style={{ color: '#10B981', fontWeight: 700 }}>{fmtDec(profile.weighted_tsua)}%</span>
+                  </div>
+                  <div className="lb-col lb-col-risk">
+                    {profile.weighted_equity_exposure != null ? (
+                      <span className="lb-exposure-badge">
+                        {fmtDec(profile.weighted_equity_exposure)}%
+                      </span>
+                    ) : (
+                      <span className="lb-risk-badge" style={{
+                        background: COMMUNITY_RISK_COLORS[profile.dominant_risk] + '22',
+                        color: COMMUNITY_RISK_COLORS[profile.dominant_risk],
+                      }}>
+                        {RISK_LABELS[profile.dominant_risk]}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="leaderboard-empty">אין משקיעים תואמים לפילטר הנוכחי</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Community: Profile Screen ────────────────────────────────────────────────
+
+function ProfileScreen({ fakeName, myProfile, leaderboard, onBack }) {
+  const isMe = myProfile && fakeName === myProfile.fake_name;
+  const [profile, setProfile] = useState(isMe ? myProfile : null);
+  const [loading, setLoading] = useState(!isMe);
+
+  useEffect(() => {
+    if (isMe && myProfile) { setProfile(myProfile); setLoading(false); return; }
+    setLoading(true);
+    fetch(`http://localhost:8000/community/profile/${encodeURIComponent(fakeName)}`)
+      .then(r => r.json())
+      .then(data => { setProfile(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [fakeName, isMe, myProfile]);
+
+  const rank = (leaderboard || []).findIndex(p => p.fake_name === fakeName) + 1;
+  const totalInCommunity = (leaderboard || []).length;
+
+  return (
+    <div className="screen community-screen">
+      <Stars />
+      <Header onReset={onBack} />
+      <div className="community-content">
+        <button className="back-btn community-back" onClick={onBack}>→ חזרה לטבלה</button>
+
+        {loading && <div className="community-loading">טוען פרופיל...</div>}
+
+        {!loading && profile && (
+          <>
+            <div className="community-card profile-header-card">
+              <div className="profile-header-inner">
+                <div className="profile-avatar-big">{getCommunityAvatar(profile.fake_name)}</div>
+                <div className="profile-header-text">
+                  <div className="profile-name-big">{profile.fake_name}</div>
+                  <div className="profile-joined-date">הצטרף {profile.joined}</div>
+                  {isMe && <span className="profile-me-badge">הפרופיל שלך ✨</span>}
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-stats-grid">
+              <div className="community-card profile-stat-card">
+                <div className="profile-stat-icon">📊</div>
+                <div className="profile-stat-val" style={{ color: '#3B82F6' }}>{fmtDec(profile.weighted_score)}</div>
+                <div className="profile-stat-label">AmoScore</div>
+              </div>
+              <div className="community-card profile-stat-card">
+                <div className="profile-stat-icon">📈</div>
+                <div className="profile-stat-val" style={{ color: '#10B981' }}>{fmtDec(profile.weighted_tsua)}%</div>
+                <div className="profile-stat-label">תשואה שנתית</div>
+              </div>
+              <div className="community-card profile-stat-card">
+                <div className="profile-stat-icon">📉</div>
+                <div className="profile-stat-val" style={{ color: '#F59E0B' }}>
+                  {profile.weighted_equity_exposure != null
+                    ? `${fmtDec(profile.weighted_equity_exposure)}%`
+                    : RISK_LABELS[profile.dominant_risk]}
+                </div>
+                <div className="profile-stat-label">חשיפה למניות</div>
+              </div>
+              <div className="community-card profile-stat-card">
+                <div className="profile-stat-icon">🏆</div>
+                <div className="profile-stat-val" style={{ color: '#F59E0B' }}>
+                  {rank > 0 ? `#${rank}` : '—'}
+                </div>
+                <div className="profile-stat-label">
+                  דירוג{totalInCommunity > 0 ? ` מתוך ${totalInCommunity}` : ''}
+                </div>
+              </div>
+            </div>
+
+            {profile.funds && profile.funds.length > 0 && (
+              <div className="community-card profile-funds-card">
+                <div className="community-card-label">הקצאת קופות</div>
+                <div className="fund-allocation-bar">
+                  {profile.funds.map((fund, i) => (
+                    <div
+                      key={fund.id}
+                      className="fund-allocation-segment"
+                      style={{ width: `${fund.pct}%`, background: FUND_PALETTE[i % FUND_PALETTE.length] }}
+                      title={`${fund.name}: ${fund.pct}%`}
+                    />
+                  ))}
+                </div>
+                <div className="fund-allocation-list">
+                  {profile.funds.map((fund, i) => (
+                    <div key={fund.id} className="fund-allocation-item">
+                      <div className="fund-dot" style={{ background: FUND_PALETTE[i % FUND_PALETTE.length] }} />
+                      <div className="fund-alloc-name">{fund.name}</div>
+                      <div className="fund-alloc-id">#{fund.id}</div>
+                      <div className="fund-alloc-pct" style={{ color: FUND_PALETTE[i % FUND_PALETTE.length] }}>
+                        {fmtDec(fund.pct)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="community-disclaimer">
+              * הנתונים מוצגים באחוזים בלבד לשמירה על פרטיות המשתמש. אין חשיפה של סכומים כספיים.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
-function ResultsScreen({ results, weights, thresholds, onReset }) {
+function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) {
   const [selectedId, setSelectedId] = useState('all');
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -1568,6 +1931,17 @@ function ResultsScreen({ results, weights, thresholds, onReset }) {
           </button>
         </div>
 
+        {onGoToInvite && (
+          <div className="community-invite-banner">
+            <div className="invite-banner-icon">🏆</div>
+            <div className="invite-banner-text">
+              <div className="invite-banner-title">רוצה לראות איך אתה ביחס למשקיעים אחרים?</div>
+              <div className="invite-banner-subtitle">הצטרף לקהילה האנונימית שלנו וגלה את הדירוג שלך</div>
+            </div>
+            <button className="invite-banner-btn" onClick={onGoToInvite}>הצטרף</button>
+          </div>
+        )}
+
         <div className="portfolio-footer">
           נבנה ב ❤️ על ידי{' '}
           <a href="https://techiloli.vercel.app/" target="_blank" rel="noopener noreferrer">
@@ -1593,6 +1967,9 @@ function App() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [viewingFile, setViewingFile] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [selectedProfileName, setSelectedProfileName] = useState(null);
 
   const results = useMemo(() => {
     if (!rawResults) return null;
@@ -1711,7 +2088,57 @@ function App() {
     return <LoadingScreen step={loadingStep} progress={progress} />;
   }
   if (screen === 'results') {
-    return <ResultsScreen results={results} weights={weights} thresholds={thresholds} onReset={() => setScreen('upload')} />;
+    return (
+      <ResultsScreen
+        results={results}
+        weights={weights}
+        thresholds={thresholds}
+        onReset={() => setScreen('upload')}
+        onGoToInvite={() => setScreen('invite')}
+      />
+    );
+  }
+  if (screen === 'invite') {
+    return (
+      <InviteScreen
+        results={results}
+        onBack={() => setScreen('results')}
+        onJoined={async (profile) => {
+          setMyProfile(profile);
+          try {
+            const res = await fetch('http://localhost:8000/community/leaderboard');
+            const data = await res.json();
+            setLeaderboardData(data.profiles || []);
+          } catch (err) {
+            console.error(err);
+          }
+          setScreen('leaderboard');
+        }}
+      />
+    );
+  }
+  if (screen === 'leaderboard') {
+    return (
+      <LeaderboardScreen
+        leaderboard={leaderboardData}
+        myProfile={myProfile}
+        onBack={() => setScreen('results')}
+        onViewProfile={(fakeName) => {
+          setSelectedProfileName(fakeName);
+          setScreen('profile');
+        }}
+      />
+    );
+  }
+  if (screen === 'profile') {
+    return (
+      <ProfileScreen
+        fakeName={selectedProfileName}
+        myProfile={myProfile}
+        leaderboard={leaderboardData}
+        onBack={() => setScreen('leaderboard')}
+      />
+    );
   }
   if (screen === 'viewer' && viewingFile) {
     return (

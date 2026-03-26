@@ -5,7 +5,7 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from src.core.risk_classifier import get_risk_level
+from src.core.risk_classifier import get_equity_exposure, get_risk_level
 from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
@@ -67,6 +67,7 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
             float,
         )
         RISK_LEVEL = get_risk_level(int(ID), low_exposure_threshold, medium_exposure_threshold)
+        EQUITY_EXPOSURE = get_equity_exposure(int(ID))
         TSUA_MITZTABERET_LETKUFA = extract_data_from_xml(
             "TSUA_MITZTABERET_LETKUFA",
             row,
@@ -91,6 +92,7 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
                 "tsua_5": TSUA_SHNATIT_MEMUZAAT_5_SHANIM,
                 "num_hevra": NUM_HEVRA,
                 "risk_level": RISK_LEVEL,
+                "equity_exposure": EQUITY_EXPOSURE,
             }
         )
         
