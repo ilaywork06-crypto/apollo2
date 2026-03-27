@@ -1485,15 +1485,18 @@ function SummaryHero({ results }) {
 function InviteScreen({ results, onJoined, onBack }) {
   const [joining, setJoining] = useState(false);
 
-  const totalAmount = (results || []).reduce((s, f) => s + (f.client?.amount ?? 0), 0);
+  // Always merge identical funds for community display/submission (fair representation)
+  const mergedResults = aggregateResults(results || []);
+
+  const totalAmount = mergedResults.reduce((s, f) => s + (f.client?.amount ?? 0), 0);
   const weightedTsua = totalAmount > 0
-    ? (results || []).reduce((s, f) => s + (f.client?.tsua_1 ?? 0) * (f.client?.amount ?? 0) / totalAmount, 0)
+    ? mergedResults.reduce((s, f) => s + (f.client?.tsua_1 ?? 0) * (f.client?.amount ?? 0) / totalAmount, 0)
     : 0;
   const weightedScore = totalAmount > 0
-    ? (results || []).filter(f => (f.client?.grade ?? 0) > 0)
-        .reduce((s, f) => s + (f.client?.grade ?? 0) * (f.client?.amount ?? 0) / totalAmount, 0)
+    ? mergedResults.filter(f => (f.client?.default_grade ?? 0) > 0)
+        .reduce((s, f) => s + (f.client?.default_grade ?? 0) * (f.client?.amount ?? 0) / totalAmount, 0)
     : 0;
-  const fundsWithExposure = (results || []).filter(f => f.client?.equity_exposure != null);
+  const fundsWithExposure = mergedResults.filter(f => f.client?.equity_exposure != null);
   const exposureWeightTotal = fundsWithExposure.reduce((s, f) => s + (f.client?.amount ?? 0), 0);
   const weightedExposure = exposureWeightTotal > 0
     ? fundsWithExposure.reduce((s, f) => s + (f.client.equity_exposure * (f.client?.amount ?? 0)), 0) / exposureWeightTotal
@@ -1502,15 +1505,15 @@ function InviteScreen({ results, onJoined, onBack }) {
   const handleJoin = async () => {
     setJoining(true);
     try {
-      const clientId = results?.[0]?.client?.client_id || 'unknown';
+      const clientId = mergedResults?.[0]?.client?.client_id || 'unknown';
       const joinData = {
         client_id: clientId,
-        funds: (results || []).map(f => ({
+        funds: mergedResults.map(f => ({
           name: f.client?.name || '',
           id: f.client?.id || '',
           risk_level: f.client?.risk_level || 'high',
           tsua_1: f.client?.tsua_1 ?? 0,
-          grade: f.client?.grade ?? 0,
+          grade: f.client?.default_grade ?? 0,
           amount: f.client?.amount ?? 0,
           equity_exposure: f.client?.equity_exposure ?? null,
           pct_of_total: totalAmount > 0
@@ -1564,7 +1567,7 @@ function InviteScreen({ results, onJoined, onBack }) {
             <div className="community-preview-stats">
               <div className="community-stat-mini">
                 <div className="community-stat-mini-val" style={{ color: '#3B82F6' }}>{fmtDec(weightedScore)}</div>
-                <div className="community-stat-mini-label">AmoScore</div>
+                <div className="community-stat-mini-label">AmoScore*</div>
               </div>
               <div className="community-stat-mini">
                 <div className="community-stat-mini-val" style={{ color: '#10B981' }}>{fmtDec(weightedTsua)}%</div>
@@ -1597,6 +1600,9 @@ function InviteScreen({ results, onJoined, onBack }) {
         </button>
         <p className="community-disclaimer-small">
           ניתן לעזוב בכל עת · המידע שלך מאוחסן באופן מקומי בלבד
+        </p>
+        <p className="community-weights-note">
+          * AmoScore בקהילה מחושב לפי משקלים קבועים וסטנדרטיים (תשואה שנה 10% · תשואה 3 שנים 20% · תשואה 5 שנים 25% · Sharp Ratio 45%) — כדי להבטיח השוואה הוגנת בין כל המשקיעים, ללא תלות בהגדרות האישיות שלך.
         </p>
       </div>
     </div>
@@ -1639,6 +1645,9 @@ function LeaderboardScreen({ leaderboard, myProfile, onViewProfile, onBack }) {
         <div className="leaderboard-hero">
           <h1 className="community-title">🏆 טבלת המשקיעים</h1>
           <div className="leaderboard-count">{(leaderboard || []).length} משקיעים בקהילה</div>
+          <div className="leaderboard-weights-note">
+            * AmoScore מחושב לפי משקלים קבועים: תשואה שנה 10% · תשואה 3 שנים 20% · תשואה 5 שנים 25% · Sharp Ratio 45%
+          </div>
         </div>
 
         <div className="leaderboard-controls">
@@ -1848,6 +1857,24 @@ function ProfileScreen({ fakeName, myProfile, leaderboard, onBack }) {
 function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) {
   const [selectedId, setSelectedId] = useState('all');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 150;
+      setAtBottom(nearBottom);
+    };
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const handleScrollToggle = () => {
+    if (atBottom) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
   const handleDownloadPDF = async () => {
     setPdfLoading(true);
@@ -1961,6 +1988,13 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
         </div>
 
       </div>
+
+      <button className={`scroll-nav-btn${atBottom ? ' scroll-nav-btn--up' : ''}`} onClick={handleScrollToggle}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points={atBottom ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+        </svg>
+        <span>{atBottom ? 'חזור לראש' : 'לסוף הדף'}</span>
+      </button>
     </div>
   );
 }
@@ -1972,7 +2006,7 @@ function App() {
   const [mislakaFiles, setMislakaFiles] = useState([]);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [rawResults, setRawResults] = useState(null);
-  const [sumSameKupa, setSumSameKupa] = useState(false);
+  const [sumSameKupa, setSumSameKupa] = useState(true);
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [badHevrot, setBadHevrot] = useState(DEFAULT_BAD_HEVROT);
   const [loadingStep, setLoadingStep] = useState(0);

@@ -16,6 +16,12 @@ _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 GEMEL_NET_PATH = _DATA_DIR / "kupot_gemel_net.xml"
 RISKS_MAP_PATH = _DATA_DIR / "risks_map.xml"
 
+# Fixed default weights used for community comparisons (fair, user-independent)
+DEFAULT_WEIGHT_1 = 10
+DEFAULT_WEIGHT_3 = 20
+DEFAULT_WEIGHT_5 = 25
+DEFAULT_WEIGHT_SHARP = 45
+
 # Parse static data once at startup
 risk_classifier.load(RISKS_MAP_PATH)
 
@@ -288,6 +294,13 @@ def run_comparison(
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
         client_kupa = next(k for k in sorted_kupot if k["ID"] == kupa["ID"])
+
+        # Calculate default_grade using fixed community weights (for fair cross-user comparison)
+        default_sorted = add_grade_and_sort(
+            copy.deepcopy(adjusted_kupot),
+            DEFAULT_WEIGHT_1, DEFAULT_WEIGHT_3, DEFAULT_WEIGHT_5, DEFAULT_WEIGHT_SHARP,
+        )
+        default_client_kupa = next(k for k in default_sorted if k["ID"] == kupa["ID"])
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
         if money == 0:
             continue
@@ -297,6 +310,7 @@ def run_comparison(
             "id": client_kupa["ID"],
             "client_id": mislaka.get("MISPAR-ZIHUY-LAKOACH", "unknown"),
             "grade": client_kupa["grade"],
+            "default_grade": default_client_kupa["grade"],
             "rank": client_ranking,
             "total_in_risk": total_kupot,
             "risk_level": risk_level,
