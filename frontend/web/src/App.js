@@ -606,7 +606,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
         {/* ── Hero ── */}
         <div className="hero">
           <div className="hero-badge">✦ AmoSight · ניתוח קופות גמל חכם</div>
-          <h1 className="hero-title">בדוק את הביצועים<br/>של הקופה שלך</h1>
+          <h1 className="hero-title">בדוק את הביצועים<br/>של הקופות שלך</h1>
           <p className="hero-sub">
             העלה קבצי XML מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופות שלך עומדת מול שוק הגמל
           </p>
