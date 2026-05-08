@@ -23,7 +23,7 @@ def remove_bad_hevrot(list_of_kupot: list[dict], bad_hevrot: list[str]) -> list[
     """
     return [kupa for kupa in list_of_kupot if kupa["hevra"] not in bad_hevrot]
 
-def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int, bad_hevrot: list[str]) -> list[dict]:
+def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int, bad_hevrot: list[str], remove_special_cases: bool) -> list[dict]:
     """Parse the GemeNet kupot XML file and return a list of kupa records.
 
     Only rows whose ``UCHLUSIYAT_YAAD`` field equals ``"כלל האוכלוסיה"``
@@ -47,7 +47,7 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
     root = hey.getroot()
     for row in root.findall("Row"):
         oclusia = extract_data_from_xml("UCHLUSIYAT_YAAD", row)
-        if oclusia != "כלל האוכלוסיה":
+        if remove_special_cases and oclusia != "כלל האוכלוסיה":
             continue
         SUG_KUPA = extract_data_from_xml("SUG_KUPA", row)
         ID = extract_data_from_xml("ID", row)
@@ -80,6 +80,7 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
         )
         list_of_kupot.append(
             {
+                "UCHLUSIYAT_YAAD": oclusia.strip(),
                 "SUG": SUG_KUPA.strip(),
                 "ID": ID.strip(),
                 "tsua_mitztaberet_letkufa": TSUA_MITZTABERET_LETKUFA,

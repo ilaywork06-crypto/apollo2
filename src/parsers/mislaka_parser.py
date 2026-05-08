@@ -123,10 +123,12 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                     extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HAFKADA-MIVNE", polisa, float),
                     extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HAFKADA", polisa, float),
                 )
-
                 kod_maslul = "fr"
                 if KOD_MASLUL_HASHKAA[-6:] != "N/A":
                     kod_maslul = str(int(KOD_MASLUL_HASHKAA[-6:])).strip()
+                
+                if SCHUM_TZVIRA_BAMASLUL == 0.0:
+                    continue
 
                 list_of_kupot.append(
                     {

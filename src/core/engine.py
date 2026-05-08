@@ -42,6 +42,7 @@ def find_matching_kupot(
         found in the Mislaka record exists in the kupa lookup table.
     """
     kupot_by_id = {kupa["ID"]: kupa for kupa in kupot_list}
+    # print(kupot_by_id)
     return [
         (mislaka, kupot_by_id[mislaka["GEMELNET_ID"]])
         for mislaka in mislaka_list
@@ -276,14 +277,21 @@ def run_comparison(
         A dict with a ``funds`` key containing a list of per-holding result
         dicts, each with ``client``, ``alternatives``, and ``golden`` keys.
     """
-    koput_list = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, bad_hevrot)
+    koput_list_full = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, [], remove_special_cases=False)
+    koput_list_full_without_hevrot = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, bad_hevrot, remove_special_cases=False)
+    koput_list = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, bad_hevrot, remove_special_cases=True)
     mislaka_list = parse_multible_mislaka_files(mislaka_file)
-    matches = find_matching_kupot(mislaka_list, koput_list)
+    matches = find_matching_kupot(mislaka_list, koput_list_full)
     funds_list = []
-
+    #print(len(matches))
     for mislaka, kupa in matches:
         sug = kupa["SUG"]
-        our_koput = [k for k in koput_list if k["SUG"] == sug]
+        #print(sug)
+
+        the_koput_we_are_all_about = koput_list
+        if kupa["UCHLUSIYAT_YAAD"] != "כלל האוכלוסיה":
+            the_koput_we_are_all_about = koput_list_full_without_hevrot
+        our_koput = [k for k in the_koput_we_are_all_about if k["SUG"] == sug]
         risk_level = kupa["risk_level"]
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
 
