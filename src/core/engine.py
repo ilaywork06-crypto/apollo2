@@ -293,20 +293,25 @@ def run_comparison(
         if kupa["UCHLUSIYAT_YAAD"] != "כלל האוכלוסיה":
             the_koput_we_are_all_about = koput_list_full_without_hevrot
         our_koput = [k for k in the_koput_we_are_all_about if k["SUG"] == sug]
+        our_koput_full = [k for k in koput_list_full if k["SUG"] == sug]
         risk_level = kupa["risk_level"]
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
 
         all_kopot_in_risk_level = get_kupot_by_risk_level(our_koput, risk_level)
+        all_koput_in_risk_level_full = get_kupot_by_risk_level(our_koput_full, risk_level)
         adjusted_kupot = apply_dmey_nihul(copy.deepcopy(all_kopot_in_risk_level), dmey_nihul)
+        adjusted_kupot_full = apply_dmey_nihul(copy.deepcopy(all_koput_in_risk_level_full), dmey_nihul)
         normalize_data(adjusted_kupot)
+        normalize_data(adjusted_kupot_full)
         sorted_kupot = add_grade_and_sort(adjusted_kupot, weight_1, weight_3, weight_5, weight_sharp)
+        sorted_koput_full = add_grade_and_sort(adjusted_kupot_full,weight_1, weight_3, weight_5, weight_sharp)
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
-        client_kupa = next(k for k in sorted_kupot if k["ID"] == kupa["ID"])
+        client_kupa = next(k for k in sorted_koput_full if k["ID"] == kupa["ID"])#sorted koput
 
         # Calculate default_grade using fixed community weights (for fair cross-user comparison)
         default_sorted = add_grade_and_sort(
-            copy.deepcopy(adjusted_kupot),
+            copy.deepcopy(adjusted_kupot_full),#adjusted koput
             DEFAULT_WEIGHT_1, DEFAULT_WEIGHT_3, DEFAULT_WEIGHT_5, DEFAULT_WEIGHT_SHARP,
         )
         default_client_kupa = next(k for k in default_sorted if k["ID"] == kupa["ID"])
