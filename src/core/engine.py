@@ -6,6 +6,7 @@ import copy
 from pathlib import Path
 from typing import Optional
 
+
 from src.core import risk_classifier
 from src.parsers.fund_parser import parse_xml_file
 from src.parsers.mislaka_parser import parse_multible_mislaka_files
