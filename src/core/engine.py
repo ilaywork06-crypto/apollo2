@@ -294,7 +294,6 @@ def run_comparison(
         sorted_kupot = add_grade_and_sort(adjusted_kupot, weight_1, weight_3, weight_5, weight_sharp)
         top_3 = get_top_3(sorted_kupot)
         client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
-        print(client_ranking, total_kupot)
         for i in sorted_kupot:
             if i["ID"] == kupa["ID"]:
                 client_kupa = i
