@@ -143,3 +143,7 @@ src/parsers/__pycache__/parser.cpython-313.pyc
 src/parsers/__pycache__/mislaka_parser.cpython-313.pyc
 src/api/__pycache__/app.cpython-313.pyc
 community.json
+
+
+.idea/
+.vscode/
