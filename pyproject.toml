@@ -10,5 +10,5 @@ dependencies = [
     "lxml>=6.0.2",
     "python-multipart>=0.0.22",
     "ruff>=0.15.7",
-    "uvicorn>=0.42.0",
+    "uvicorn>=0.46.0",
 ]
