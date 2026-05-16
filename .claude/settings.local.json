@@ -9,7 +9,9 @@
       "Bash(grep -E \"\\\\.\\(xml|json\\)$\")",
       "Bash(git mv:*)",
       "Bash(git rm:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(grep -E \"\\(package\\\\.json|README|\\\\.md$\\)\")",
+      "Bash(grep -E \"\\\\.py$\")"
     ]
   }
 }
