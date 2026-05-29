@@ -36,7 +36,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const getRiskExposure = (thresholds) => ({
   low:    `0–${thresholds.low}% חשיפה למניות`,
   medium: `${thresholds.low}–${thresholds.medium}% חשיפה למניות`,
-  high:   `${thresholds.medium}–100% חשיפה למניות`,
+  high:   `${thresholds.medium}–130% חשיפה למניות`,
 });
 
 const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 45 };
@@ -439,13 +439,13 @@ function RiskBandEditor({ low, medium, onChange }) {
   };
 
   const setMedium = (val) => {
-    const v = Math.max(low + 5, Math.min(val, 100));
+    const v = Math.max(low + 5, Math.min(val, 130));
     onChange({ low, medium: v });
   };
 
-  const lowW  = low;
-  const medW  = medium - low;
-  const highW = 100 - medium;
+  const lowW  = (low / 130) * 100;
+  const medW  = ((medium - low) / 130) * 100;
+  const highW = ((130 - medium) / 130) * 100;
 
   return (
     <div className="risk-band-editor">
@@ -465,11 +465,11 @@ function RiskBandEditor({ low, medium, onChange }) {
         </div>
 
         {/* Threshold markers */}
-        <div className="risk-band-marker" style={{ left: `${low}%` }}>
+        <div className="risk-band-marker" style={{ left: `${(low / 130) * 100}%` }}>
           <div className="risk-band-marker-line" />
           <div className="risk-band-marker-label">{low}%</div>
         </div>
-        <div className="risk-band-marker" style={{ left: `${medium}%` }}>
+        <div className="risk-band-marker" style={{ left: `${(medium / 130) * 100}%` }}>
           <div className="risk-band-marker-line" />
           <div className="risk-band-marker-label">{medium}%</div>
         </div>
@@ -492,7 +492,7 @@ function RiskBandEditor({ low, medium, onChange }) {
         <div className="risk-band-legend-item">
           <span className="risk-band-dot risk-band-dot--high" />
           <span className="risk-band-legend-text">
-            <strong>גבוה</strong> — {medium}%–100% חשיפה
+            <strong>גבוה</strong> — {medium}%–130% חשיפה
           </span>
         </div>
       </div>
@@ -522,7 +522,7 @@ function RiskBandEditor({ low, medium, onChange }) {
           <div className="weight-stepper">
             <button className="weight-btn" onClick={() => setMedium(medium - 5)} disabled={medium <= low + 5}>−</button>
             <span className="weight-val">{medium}%</span>
-            <button className="weight-btn" onClick={() => setMedium(medium + 5)} disabled={medium >= 100}>+</button>
+            <button className="weight-btn" onClick={() => setMedium(medium + 5)} disabled={medium >= 130}>+</button>
           </div>
           <div className="risk-band-control-hint">חשיפה מנייתית מעל {medium}% = סיכון גבוה</div>
         </div>

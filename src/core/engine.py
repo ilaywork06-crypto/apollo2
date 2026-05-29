@@ -106,6 +106,10 @@ def normalize_data(funds_list: list[dict]) -> None:
     ]
     for field in fields:
         values = [fund[field] for fund in funds_list if fund[field] != 0.0]
+        if not values:
+            for fund in funds_list:
+                fund[field + "_normalized"] = 0.0
+            continue
         min_value = min(values)
         max_value = max(values)
         for fund in funds_list:
@@ -292,7 +296,6 @@ def run_comparison(
         adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_risk_level), dmey_nihul)
         normalize_data(adjusted_funds)
         sorted_funds = add_grade_and_sort(adjusted_funds, weight_1, weight_3, weight_5, weight_sharp)
-        top_3 = get_top_3(sorted_funds)
         client_ranking, total_funds = get_client_ranking(sorted_funds, fund["ID"])
         for i in sorted_funds:
             if i["ID"] == fund["ID"]:
@@ -333,30 +336,33 @@ def run_comparison(
         golden = {}
         if risk_level != "high":
             all_funds_in_high_risk_level = get_funds_by_risk_level(our_funds, "high")
-            golden_adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_high_risk_level), dmey_nihul)
-            normalize_data(golden_adjusted_funds)
-            golden_sorted_funds = add_grade_and_sort(
-                golden_adjusted_funds, weight_1, weight_3, weight_5, weight_sharp
-            )
-            better_gold = get_top_3(golden_sorted_funds)[0]
-            potential_amount_gold = calculate_potential_amount(money, client_fund, better_gold)
-            golden = {
-                "name": better_gold["fund_name"],
-                "id": better_gold["ID"],
-                "grade": better_gold["grade"],
-                "rank": 1,
-                "hevra": better_gold["hevra"],
-                "tsua_1": round(better_gold["tsua_mitztaberet_letkufa"], 2),
-                "tsua_3": round(better_gold["tsua_3"], 2),
-                "tsua_5": round(better_gold["tsua_5"], 2),
-                "potential_amount": potential_amount_gold,
-                "diff": round(potential_amount_gold - money, 2),
-                "diff_percent": round((potential_amount_gold - money) / money * 100, 1),
-            }
+            if all_funds_in_high_risk_level:
+                golden_adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_high_risk_level), dmey_nihul)
+                normalize_data(golden_adjusted_funds)
+                golden_sorted_funds = add_grade_and_sort(
+                    golden_adjusted_funds, weight_1, weight_3, weight_5, weight_sharp
+                )
+                better_gold = get_top_3(golden_sorted_funds)[0]
+                potential_amount_gold = calculate_potential_amount(money, client_fund, better_gold)
+                golden = {
+                    "name": better_gold["fund_name"],
+                    "id": better_gold["ID"],
+                    "grade": better_gold["grade"],
+                    "rank": 1,
+                    "hevra": better_gold["hevra"],
+                    "tsua_1": round(better_gold["tsua_mitztaberet_letkufa"], 2),
+                    "tsua_3": round(better_gold["tsua_3"], 2),
+                    "tsua_5": round(better_gold["tsua_5"], 2),
+                    "potential_amount": potential_amount_gold,
+                    "diff": round(potential_amount_gold - money, 2),
+                    "diff_percent": round((potential_amount_gold - money) / money * 100, 1),
+                }
 
         alternatives = []
         fund_rank = 1
-        for better_fund in top_3:
+        for better_fund in sorted_funds:
+            if len(alternatives) >= 3:
+                break
             if better_fund["ID"] != client_fund["ID"]:
                 potential_amount = calculate_potential_amount(money, client_fund, better_fund)
                 alt = {
