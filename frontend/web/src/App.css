@@ -711,6 +711,64 @@ body::before {
   background: var(--accent-blue);
 }
 
+/* Risk override selector */
+.risk-override-wrap {
+  padding: 4px 0 8px;
+}
+
+.risk-override-desc {
+  font-size: 13px;
+  color: var(--text-muted, #888);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.risk-override-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.risk-override-btn {
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  color: var(--text, #e2e8f0);
+}
+
+.risk-override-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.risk-override-btn--active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent-blue, #3B82F6);
+}
+
+.risk-override-btn-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.risk-override-btn-desc {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+}
+
+.risk-override-btn--active .risk-override-btn-desc {
+  color: var(--accent-blue, #3B82F6);
+}
+
 /* Analyze button */
 .btn-analyze {
   display: block;

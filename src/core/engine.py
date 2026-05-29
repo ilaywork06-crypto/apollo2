@@ -259,6 +259,7 @@ def run_comparison(
     low_exposure_threshold: float,
     medium_exposure_threshold: float,
     bad_hevrot: list[str],
+    override_risk_level: str | None = None,
 ) -> dict:
     """Orchestrate the full fund comparison for all holdings in the Mislaka files.
 
@@ -291,8 +292,12 @@ def run_comparison(
         funds_to_suggest.append(fund)
         our_funds = [f for f in funds_to_suggest if f["SUG"] == sug]
         risk_level = fund["risk_level"]
+        comparison_risk_level = override_risk_level if override_risk_level else risk_level
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
-        all_funds_in_risk_level = get_funds_by_risk_level(our_funds, risk_level)
+        all_funds_in_risk_level = get_funds_by_risk_level(our_funds, comparison_risk_level)
+        if override_risk_level and not any(f["ID"] == fund["ID"] for f in all_funds_in_risk_level):
+            client_base = next((f for f in our_funds if f["ID"] == fund["ID"]), fund)
+            all_funds_in_risk_level = [client_base] + all_funds_in_risk_level
         adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_risk_level), dmey_nihul)
         normalize_data(adjusted_funds)
         sorted_funds = add_grade_and_sort(adjusted_funds, weight_1, weight_3, weight_5, weight_sharp)
@@ -334,7 +339,7 @@ def run_comparison(
         }
 
         golden = {}
-        if risk_level != "high":
+        if override_risk_level is None and risk_level != "high":
             all_funds_in_high_risk_level = get_funds_by_risk_level(our_funds, "high")
             if all_funds_in_high_risk_level:
                 golden_adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_high_risk_level), dmey_nihul)
@@ -344,19 +349,22 @@ def run_comparison(
                 )
                 better_gold = get_top_3(golden_sorted_funds)[0]
                 potential_amount_gold = calculate_potential_amount(money, client_fund, better_gold)
-                golden = {
-                    "name": better_gold["fund_name"],
-                    "id": better_gold["ID"],
-                    "grade": better_gold["grade"],
-                    "rank": 1,
-                    "hevra": better_gold["hevra"],
-                    "tsua_1": round(better_gold["tsua_mitztaberet_letkufa"], 2),
-                    "tsua_3": round(better_gold["tsua_3"], 2),
-                    "tsua_5": round(better_gold["tsua_5"], 2),
-                    "potential_amount": potential_amount_gold,
-                    "diff": round(potential_amount_gold - money, 2),
-                    "diff_percent": round((potential_amount_gold - money) / money * 100, 1),
-                }
+                best_same_risk = next((f for f in sorted_funds if f["ID"] != client_fund["ID"]), None)
+                best_same_risk_potential = calculate_potential_amount(money, client_fund, best_same_risk) if best_same_risk else 0
+                if potential_amount_gold > best_same_risk_potential:
+                    golden = {
+                        "name": better_gold["fund_name"],
+                        "id": better_gold["ID"],
+                        "grade": better_gold["grade"],
+                        "rank": 1,
+                        "hevra": better_gold["hevra"],
+                        "tsua_1": round(better_gold["tsua_mitztaberet_letkufa"], 2),
+                        "tsua_3": round(better_gold["tsua_3"], 2),
+                        "tsua_5": round(better_gold["tsua_5"], 2),
+                        "potential_amount": potential_amount_gold,
+                        "diff": round(potential_amount_gold - money, 2),
+                        "diff_percent": round((potential_amount_gold - money) / money * 100, 1),
+                    }
 
         alternatives = []
         fund_rank = 1

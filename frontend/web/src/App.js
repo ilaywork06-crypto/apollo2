@@ -590,7 +590,7 @@ function HevrotChecklist({ badHevrot, onChange }) {
 
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameFund, onSumSameFundChange, badHevrot, onBadHevrotChange, onAnalyze }) {
+function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameFund, onSumSameFundChange, badHevrot, onBadHevrotChange, overrideRiskLevel, onOverrideRiskLevelChange, onAnalyze }) {
   const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
   const ready = mislakaFiles.length > 0 && sum === 100;
   const hasFiles = mislakaFiles.length > 0;
@@ -687,10 +687,45 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           />
         </div>
 
-        {/* ── Step 4: Aggregate ── */}
+        {/* ── Step 4: Override Risk Level ── */}
         <div className="upload-step-card">
           <div className="step-card-header">
             <div className="step-card-num">04</div>
+            <div className="step-card-label">קבוצת השוואה</div>
+            {overrideRiskLevel !== null && (
+              <button className="quick-action-btn quick-action-btn--reset" onClick={() => onOverrideRiskLevelChange(null)}>
+                ↺ ברירת מחדל
+              </button>
+            )}
+          </div>
+          <div className="risk-override-wrap">
+            <div className="risk-override-desc">
+              בברירת מחדל כל קופה מושווית לקופות ברמת הסיכון שלה. ניתן לבחור רמת סיכון קבועה להשוואה עבור כל הקופות — במצב זה לא יוצג אפשרות הזהב.
+            </div>
+            <div className="risk-override-options">
+              {[
+                { value: null,     label: 'ברירת מחדל', desc: 'לפי רמת סיכון הקופה' },
+                { value: 'low',    label: 'נמוך',        desc: 'השוואה לקבוצת סיכון נמוך' },
+                { value: 'medium', label: 'בינוני',      desc: 'השוואה לקבוצת סיכון בינוני' },
+                { value: 'high',   label: 'גבוה',        desc: 'השוואה לקבוצת סיכון גבוה' },
+              ].map(opt => (
+                <button
+                  key={String(opt.value)}
+                  className={`risk-override-btn${overrideRiskLevel === opt.value ? ' risk-override-btn--active' : ''}`}
+                  onClick={() => onOverrideRiskLevelChange(opt.value)}
+                >
+                  <span className="risk-override-btn-label">{opt.label}</span>
+                  <span className="risk-override-btn-desc">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Step 5: Aggregate ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header">
+            <div className="step-card-num">05</div>
             <div className="step-card-label">איחוד קופות זהות</div>
           </div>
           <div className="aggregate-toggle-row">
@@ -713,10 +748,10 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           </div>
         </div>
 
-        {/* ── Step 5: Hevrot ── */}
+        {/* ── Step 6: Hevrot ── */}
         <div className="upload-step-card">
           <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setHevrotOpen(o => !o)}>
-            <div className="step-card-num">05</div>
+            <div className="step-card-num">06</div>
             <div className="step-card-label">בחירת חברות מנהלות</div>
             <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
               {hevrotOpen ? '▲ סגור' : '▼ פתח'}
@@ -1016,7 +1051,7 @@ function FundResults({ data, weights, thresholds }) {
 
       {/* 6 ─ High-risk option box + Gold card */}
       <div className="bottom-cards-row">
-        {bestAlt && client.rank !== 1 && (bestAlt.potential_amount > client.amount) && (
+        {bestAlt && (client.rank !== 1 || (gold && gold.potential_amount > client.amount)) && (bestAlt.potential_amount > client.amount) && (
           <div className="highrisk-card">
             <div className="highrisk-icon">⚡</div>
             <div className="highrisk-body">
@@ -2009,6 +2044,7 @@ function App() {
   const [sumSameFund, setSumSameFund] = useState(true);
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [badHevrot, setBadHevrot] = useState(DEFAULT_BAD_HEVROT);
+  const [overrideRiskLevel, setOverrideRiskLevel] = useState(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [viewingFile, setViewingFile] = useState(null);
@@ -2106,6 +2142,7 @@ function App() {
       formData.append('client_id', 'amo_sight_user');
       mislakaFiles.forEach(f => formData.append('mislaka_file', f));
       badHevrot.forEach(h => formData.append('bad_hevrot', h));
+      if (overrideRiskLevel) formData.append('override_risk_level', overrideRiskLevel);
 
       const res = await fetch('http://localhost:8000/compare', {
         method: 'POST',
@@ -2214,6 +2251,8 @@ function App() {
       onSumSameFundChange={setSumSameFund}
       badHevrot={badHevrot}
       onBadHevrotChange={setBadHevrot}
+      overrideRiskLevel={overrideRiskLevel}
+      onOverrideRiskLevelChange={setOverrideRiskLevel}
       onAnalyze={handleAnalyze}
     />
   );

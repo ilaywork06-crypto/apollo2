@@ -76,6 +76,7 @@ async def compare(
     weight_sharp: int = Form(),
     mislaka_file: list[UploadFile] = File(...),
     bad_hevrot: list[str] = Form([]),
+    override_risk_level: str | None = Form(None),
 ) -> dict:
     l_con = []
     for file in mislaka_file:
@@ -90,6 +91,7 @@ async def compare(
         low_exposure_threshold=low_exposure_threshold,
         medium_exposure_threshold=medium_exposure_threshold,
         bad_hevrot=bad_hevrot,
+        override_risk_level=override_risk_level,
     )
 
 
