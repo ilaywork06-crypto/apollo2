@@ -85,7 +85,7 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
             mispar_zihuy_file = val
         break
 
-    list_of_kupot = []
+    list_of_funds = []
     for row in root.iter("Mutzar"):
         KOD_MEZAHE_YATZRAN = extract_data_from_xml(".//KOD-MEZAHE-YATZRAN", row)
         # Try per-Mutzar YeshutLakoach first, fall back to file-level
@@ -130,7 +130,7 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                 if SCHUM_TZVIRA_BAMASLUL == 0.0:
                     continue
 
-                list_of_kupot.append(
+                list_of_funds.append(
                     {
                         "GEMELNET_ID": kod_maslul,
                         "SHEM-TOCHNIT": SHEM_TOCHNIT.strip(),
@@ -142,4 +142,4 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                         "MISPAR-ZIHUY-LAKOACH": mispar_zihuy,
                     }
                 )
-    return list_of_kupot
+    return list_of_funds

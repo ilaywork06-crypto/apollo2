@@ -80,7 +80,7 @@ const WEIGHT_FIELDS = [
 
 const fmt = n => Math.round(n).toLocaleString('he-IL');
 
-// ─── Kupa Aggregation ─────────────────────────────────────────────────────────
+// ─── Fund Aggregation ─────────────────────────────────────────────────────────
 
 function aggregateResults(results) {
   const groups = new Map();
@@ -590,7 +590,7 @@ function HevrotChecklist({ badHevrot, onChange }) {
 
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameKupa, onSumSameKupaChange, badHevrot, onBadHevrotChange, onAnalyze }) {
+function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameFund, onSumSameFundChange, badHevrot, onBadHevrotChange, onAnalyze }) {
   const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
   const ready = mislakaFiles.length > 0 && sum === 100;
   const hasFiles = mislakaFiles.length > 0;
@@ -697,18 +697,18 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
             <div className="aggregate-toggle-info">
               <div className="aggregate-toggle-title">סכום מופעים של אותה קופה</div>
               <div className="aggregate-toggle-desc">
-                {sumSameKupa
+                {sumSameFund
                   ? 'מופעים מרובים של אותה קופה (לפי מספר קופה) יאוחדו וסכום הצבירות יסוכם'
                   : 'כל מופע של קופה יוצג בנפרד, גם אם מספר הקופה זהה'}
               </div>
             </div>
-            <label className="kupa-toggle">
+            <label className="fund-toggle">
               <input
                 type="checkbox"
-                checked={sumSameKupa}
-                onChange={e => onSumSameKupaChange(e.target.checked)}
+                checked={sumSameFund}
+                onChange={e => onSumSameFundChange(e.target.checked)}
               />
-              <span className="kupa-toggle-slider" />
+              <span className="fund-toggle-slider" />
             </label>
           </div>
         </div>
@@ -2006,7 +2006,7 @@ function App() {
   const [mislakaFiles, setMislakaFiles] = useState([]);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [rawResults, setRawResults] = useState(null);
-  const [sumSameKupa, setSumSameKupa] = useState(true);
+  const [sumSameFund, setSumSameFund] = useState(true);
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [badHevrot, setBadHevrot] = useState(DEFAULT_BAD_HEVROT);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -2018,8 +2018,8 @@ function App() {
 
   const results = useMemo(() => {
     if (!rawResults) return null;
-    return sumSameKupa ? aggregateResults(rawResults) : rawResults;
-  }, [rawResults, sumSameKupa]);
+    return sumSameFund ? aggregateResults(rawResults) : rawResults;
+  }, [rawResults, sumSameFund]);
 
   const handleRemoveMislakaFile = (idx) => {
     setMislakaFiles(prev => prev.filter((_, i) => i !== idx));
@@ -2210,8 +2210,8 @@ function App() {
       onWeightsChange={setWeights}
       thresholds={thresholds}
       onThresholdsChange={setThresholds}
-      sumSameKupa={sumSameKupa}
-      onSumSameKupaChange={setSumSameKupa}
+      sumSameFund={sumSameFund}
+      onSumSameFundChange={setSumSameFund}
       badHevrot={badHevrot}
       onBadHevrotChange={setBadHevrot}
       onAnalyze={handleAnalyze}

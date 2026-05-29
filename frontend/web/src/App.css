@@ -665,7 +665,7 @@ body::before {
   line-height: 1.5;
 }
 
-.kupa-toggle {
+.fund-toggle {
   position: relative;
   display: inline-block;
   width: 52px;
@@ -673,13 +673,13 @@ body::before {
   flex-shrink: 0;
 }
 
-.kupa-toggle input {
+.fund-toggle input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.kupa-toggle-slider {
+.fund-toggle-slider {
   position: absolute;
   cursor: pointer;
   inset: 0;
@@ -689,7 +689,7 @@ body::before {
   transition: background 0.2s, border-color 0.2s;
 }
 
-.kupa-toggle-slider::before {
+.fund-toggle-slider::before {
   content: '';
   position: absolute;
   width: 20px;
@@ -701,12 +701,12 @@ body::before {
   transition: transform 0.2s, background 0.2s;
 }
 
-.kupa-toggle input:checked + .kupa-toggle-slider {
+.fund-toggle input:checked + .fund-toggle-slider {
   background: rgba(59, 130, 246, 0.25);
   border-color: var(--accent-blue);
 }
 
-.kupa-toggle input:checked + .kupa-toggle-slider::before {
+.fund-toggle input:checked + .fund-toggle-slider::before {
   transform: translateX(-24px);
   background: var(--accent-blue);
 }

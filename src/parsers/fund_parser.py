@@ -10,21 +10,21 @@ from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
 
-def remove_bad_hevrot(list_of_kupot: list[dict], bad_hevrot: list[str]) -> list[dict]:
+def remove_bad_hevrot(list_of_funds: list[dict], bad_hevrot: list[str]) -> list[dict]:
     """Remove records with invalid or excluded company names.
 
     Args:
-        list_of_kupot: A list of kupa dicts, each containing a ``hevra`` key.
+        list_of_funds: A list of fund dicts, each containing a ``hevra`` key.
         bad_hevrot: A set of company names to exclude.
 
     Returns:
-        A filtered list of kupa dicts, excluding those whose ``hevra`` value
+        A filtered list of fund dicts, excluding those whose ``hevra`` value
         is in the predefined set of bad company names.
     """
-    return [kupa for kupa in list_of_kupot if kupa["hevra"] not in bad_hevrot]
+    return [fund for fund in list_of_funds if fund["hevra"] not in bad_hevrot]
 
 def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int, bad_hevrot: list[str], remove_special_cases: bool) -> list[dict]:
-    """Parse the GemeNet kupot XML file and return a list of kupa records.
+    """Parse the GemeNet funds XML file and return a list of fund records.
 
     Only rows whose ``UCHLUSIYAT_YAAD`` field equals ``"כלל האוכלוסיה"``
     (general population) are included.  Each returned dict contains
@@ -36,13 +36,13 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
         medium_exposure_threshold: The threshold for medium equity exposure.
 
     Returns:
-        A list of dicts, each representing one kupa with the following keys:
+        A list of dicts, each representing one fund with the following keys:
         ``SUG``, ``ID``, ``tsua_mitztaberet_letkufa``,
-        ``sharp_ribit_hasarot_sikun``, ``shem_kupa``, ``hevra``,
+        ``sharp_ribit_hasarot_sikun``, ``fund_name``, ``hevra``,
         ``hitmahut_rashit``, ``hitmahut_mishnit``, ``tsua_3``, ``tsua_5``,
         ``num_hevra``, and ``risk_level``.
     """
-    list_of_kupot = []
+    list_of_funds = []
     hey = ET.parse(content)
     root = hey.getroot()
     for row in root.findall("Row"):
@@ -78,14 +78,14 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
             row,
             float,
         )
-        list_of_kupot.append(
+        list_of_funds.append(
             {
                 "UCHLUSIYAT_YAAD": oclusia.strip(),
                 "SUG": SUG_KUPA.strip(),
                 "ID": ID.strip(),
                 "tsua_mitztaberet_letkufa": TSUA_MITZTABERET_LETKUFA,
                 "sharp_ribit_hasarot_sikun": SHARP_RIBIT_HASRAT_SIKUN,
-                "shem_kupa": SHM_KUPA.strip(),
+                "fund_name": SHM_KUPA.strip(),
                 "hevra": SHM_HEVRA_MENAHELET.strip(),
                 "hitmahut_rashit": HITMAHUT_RASHIT.strip(),
                 "hitmahut_mishnit": HITMAHUT_MISHNIT.strip(),
@@ -96,5 +96,5 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
                 "equity_exposure": EQUITY_EXPOSURE,
             }
         )
-        
-    return remove_bad_hevrot(list_of_kupot, bad_hevrot)
+
+    return remove_bad_hevrot(list_of_funds, bad_hevrot)

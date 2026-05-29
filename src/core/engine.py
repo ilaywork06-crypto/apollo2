@@ -29,73 +29,73 @@ risk_classifier.load(RISKS_MAP_PATH)
 # ----- Functions ----- #
 
 
-def find_matching_kupot(
-    mislaka_list: list[dict], kupot_list: list[dict]
+def find_matching_funds(
+    mislaka_list: list[dict], funds_list: list[dict]
 ) -> list[tuple[dict, dict]]:
-    """Match each Mislaka entry to its corresponding kupa in the GemeNet list.
+    """Match each Mislaka entry to its corresponding fund in the GemeNet list.
 
     Args:
         mislaka_list: Parsed records from one or more Mislaka XML files.
-        kupot_list: Full list of kupa records from the GemeNet XML file.
+        funds_list: Full list of fund records from the GemeNet XML file.
 
     Returns:
-        A list of ``(mislaka_record, kupa_record)`` pairs where the GemeNet ID
-        found in the Mislaka record exists in the kupa lookup table.
+        A list of ``(mislaka_record, fund_record)`` pairs where the GemeNet ID
+        found in the Mislaka record exists in the fund lookup table.
     """
-    kupot_by_id = {kupa["ID"]: kupa for kupa in kupot_list}
+    funds_by_id = {fund["ID"]: fund for fund in funds_list}
     return [
-        (mislaka, kupot_by_id[mislaka["GEMELNET_ID"]])
+        (mislaka, funds_by_id[mislaka["GEMELNET_ID"]])
         for mislaka in mislaka_list
-        if mislaka["GEMELNET_ID"] in kupot_by_id
+        if mislaka["GEMELNET_ID"] in funds_by_id
     ]
 
 
-def get_kupot_by_risk_level(kupot_list: list[dict], risk_level: str) -> list[dict]:
-    """Filter a list of kupot to only those matching the given risk level.
+def get_funds_by_risk_level(funds_list: list[dict], risk_level: str) -> list[dict]:
+    """Filter a list of funds to only those matching the given risk level.
 
     Args:
-        kupot_list: List of kupa dicts, each containing a ``risk_level`` key.
+        funds_list: List of fund dicts, each containing a ``risk_level`` key.
         risk_level: The target risk level string (e.g. ``"low"``, ``"medium"``,
             ``"high"``).
 
     Returns:
-        A filtered list of kupa dicts whose ``risk_level`` equals *risk_level*.
+        A filtered list of fund dicts whose ``risk_level`` equals *risk_level*.
     """
-    return [kupa for kupa in kupot_list if kupa["risk_level"] == risk_level]
+    return [fund for fund in funds_list if fund["risk_level"] == risk_level]
 
 
-def apply_dmey_nihul(kupot_list: list[dict], dmey_nihul: float) -> list[dict]:
-    """Subtract management fees from the return fields of each kupa in-place.
+def apply_dmey_nihul(funds_list: list[dict], dmey_nihul: float) -> list[dict]:
+    """Subtract management fees from the return fields of each fund in-place.
 
-    Only subtracts when the return value is positive, to avoid distorting kupot
+    Only subtracts when the return value is positive, to avoid distorting funds
     with missing or zero data.
 
     Args:
-        kupot_list: List of kupa dicts to adjust (modified in-place).
+        funds_list: List of fund dicts to adjust (modified in-place).
         dmey_nihul: Annual management-fee percentage to deduct.
 
     Returns:
         The same list with adjusted return values.
     """
-    for kupa in kupot_list:
-        if kupa["tsua_5"] > 0.0:
-            kupa["tsua_5"] -= dmey_nihul
-        if kupa["tsua_3"] > 0.0:
-            kupa["tsua_3"] -= dmey_nihul
-        if kupa["tsua_mitztaberet_letkufa"] > 0.0:
-            kupa["tsua_mitztaberet_letkufa"] -= dmey_nihul
-    return kupot_list
+    for fund in funds_list:
+        if fund["tsua_5"] > 0.0:
+            fund["tsua_5"] -= dmey_nihul
+        if fund["tsua_3"] > 0.0:
+            fund["tsua_3"] -= dmey_nihul
+        if fund["tsua_mitztaberet_letkufa"] > 0.0:
+            fund["tsua_mitztaberet_letkufa"] -= dmey_nihul
+    return funds_list
 
 
-def normalize_data(kupot_list: list[dict]) -> None:
+def normalize_data(funds_list: list[dict]) -> None:
     """Add min-max normalised variants (0–100) of the key performance fields.
 
     For each of the four performance fields, a new ``<field>_normalized`` key
-    is added to every kupa dict.  Kupot with a raw value of ``0.0`` receive a
+    is added to every fund dict.  Funds with a raw value of ``0.0`` receive a
     normalised score of ``0.0`` without affecting the normalisation range.
 
     Args:
-        kupot_list: List of kupa dicts to enrich with normalised fields
+        funds_list: List of fund dicts to enrich with normalised fields
             (modified in-place).
     """
     fields = [
@@ -105,34 +105,34 @@ def normalize_data(kupot_list: list[dict]) -> None:
         "tsua_mitztaberet_letkufa",
     ]
     for field in fields:
-        values = [kupa[field] for kupa in kupot_list if kupa[field] != 0.0]
+        values = [fund[field] for fund in funds_list if fund[field] != 0.0]
         min_value = min(values)
         max_value = max(values)
-        for kupa in kupot_list:
-            if kupa[field] != 0.0:
-                kupa[field + "_normalized"] = (
-                    (kupa[field] - min_value) / (max_value - min_value) * 100
+        for fund in funds_list:
+            if fund[field] != 0.0:
+                fund[field + "_normalized"] = (
+                    (fund[field] - min_value) / (max_value - min_value) * 100
                     if max_value > min_value
                     else 0.0
                 )
             else:
-                kupa[field + "_normalized"] = 0.0
+                fund[field + "_normalized"] = 0.0
 
 
 def calculate_grade(
-    kupa: dict,
+    fund: dict,
     weight_1: int,
     weight_3: int,
     weight_5: int,
     weight_sharp: int,
 ) -> float:
-    """Compute a weighted composite score for a single kupa.
+    """Compute a weighted composite score for a single fund.
 
     All four normalised metrics must be non-zero for a grade to be calculated;
     otherwise ``0`` is returned to indicate insufficient data.
 
     Args:
-        kupa: Kupa dict that already contains normalised performance fields.
+        fund: Fund dict that already contains normalised performance fields.
         weight_1: Weight for the 1-year cumulative return (normalised).
         weight_3: Weight for the 3-year average annual return (normalised).
         weight_5: Weight for the 5-year average annual return (normalised).
@@ -144,13 +144,13 @@ def calculate_grade(
     """
     weights = {}
 
-    if kupa.get("tsua_mitztaberet_letkufa_normalized") != 0.0:
+    if fund.get("tsua_mitztaberet_letkufa_normalized") != 0.0:
         weights["tsua_mitztaberet_letkufa_normalized"] = weight_1
-    if kupa.get("tsua_3_normalized") != 0.0:
+    if fund.get("tsua_3_normalized") != 0.0:
         weights["tsua_3_normalized"] = weight_3
-    if kupa.get("tsua_5_normalized") != 0.0:
+    if fund.get("tsua_5_normalized") != 0.0:
         weights["tsua_5_normalized"] = weight_5
-    if kupa.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
+    if fund.get("sharp_ribit_hasarot_sikun_normalized") != 0.0:
         weights["sharp_ribit_hasarot_sikun_normalized"] = weight_sharp
 
     if not weights:
@@ -160,21 +160,21 @@ def calculate_grade(
         return 0
     grade = 0
     for field, weight in weights.items():
-        grade += kupa[field] * (weight / total_weight)
+        grade += fund[field] * (weight / total_weight)
     return round(grade, 2)
 
 
 def add_grade_and_sort(
-    kupot_list: list[dict],
+    funds_list: list[dict],
     weight_1: int,
     weight_3: int,
     weight_5: int,
     weight_sharp: int,
 ) -> list[dict]:
-    """Assign a composite grade to each kupa and return them sorted descending.
+    """Assign a composite grade to each fund and return them sorted descending.
 
     Args:
-        kupot_list: List of kupa dicts with normalised performance fields.
+        funds_list: List of fund dicts with normalised performance fields.
         weight_1: Weight for the 1-year cumulative return metric.
         weight_3: Weight for the 3-year average annual return metric.
         weight_5: Weight for the 5-year average annual return metric.
@@ -182,66 +182,66 @@ def add_grade_and_sort(
 
     Returns:
         The same list sorted from highest grade to lowest, with a ``grade``
-        key added to every kupa dict.
+        key added to every fund dict.
     """
-    for kupa in kupot_list:
-        kupa["grade"] = calculate_grade(kupa, weight_1, weight_3, weight_5, weight_sharp)
+    for fund in funds_list:
+        fund["grade"] = calculate_grade(fund, weight_1, weight_3, weight_5, weight_sharp)
 
-    return sorted(kupot_list, key=lambda x: x["grade"], reverse=True)
+    return sorted(funds_list, key=lambda x: x["grade"], reverse=True)
 
 
-def get_top_3(sorted_kupot: list[dict]) -> list[dict]:
-    """Return the top three kupot from an already-sorted list.
+def get_top_3(sorted_funds: list[dict]) -> list[dict]:
+    """Return the top three funds from an already-sorted list.
 
     Args:
-        sorted_kupot: Kupot list sorted from best to worst grade.
+        sorted_funds: Funds list sorted from best to worst grade.
 
     Returns:
-        The first three elements of *sorted_kupot* (fewer if the list is
+        The first three elements of *sorted_funds* (fewer if the list is
         shorter than three).
     """
-    return sorted_kupot[:3]
+    return sorted_funds[:3]
 
 
 def get_client_ranking(
-    sorted_kupot: list[dict], client_kupa_id: str
+    sorted_funds: list[dict], client_fund_id: str
 ) -> tuple[Optional[int], int]:
-    """Find the 1-based rank of the client's kupa within a sorted list.
+    """Find the 1-based rank of the client's fund within a sorted list.
 
     Args:
-        sorted_kupot: Kupot list sorted from best to worst grade.
-        client_kupa_id: The ``ID`` string of the client's current kupa.
+        sorted_funds: Funds list sorted from best to worst grade.
+        client_fund_id: The ``ID`` string of the client's current fund.
 
     Returns:
         A tuple of ``(rank, total)`` where *rank* is the 1-based position of
-        the client's kupa (or ``None`` if not found) and *total* is the length
-        of *sorted_kupot*.
+        the client's fund (or ``None`` if not found) and *total* is the length
+        of *sorted_funds*.
     """
-    for i, kupa in enumerate(sorted_kupot):
-        if kupa["ID"] == client_kupa_id:
-            return i + 1, len(sorted_kupot)
-    return None, len(sorted_kupot)
+    for i, fund in enumerate(sorted_funds):
+        if fund["ID"] == client_fund_id:
+            return i + 1, len(sorted_funds)
+    return None, len(sorted_funds)
 
 
 def calculate_potential_amount(
-    current_amount: float, current_kupa: dict, better_kupa: dict
+    current_amount: float, current_fund: dict, better_fund: dict
 ) -> float:
-    """Estimate the portfolio value if the client switched to a better kupa.
+    """Estimate the portfolio value if the client switched to a better fund.
 
     The projection applies the difference in 1-year cumulative returns between
-    the two kupot to the client's current savings balance.
+    the two funds to the client's current savings balance.
 
     Args:
         current_amount: The client's current accumulated savings balance.
-        current_kupa: Dict for the client's current kupa (must contain
+        current_fund: Dict for the client's current fund (must contain
             ``tsua_mitztaberet_letkufa``).
-        better_kupa: Dict for the comparison kupa (must contain
+        better_fund: Dict for the comparison fund (must contain
             ``tsua_mitztaberet_letkufa``).
 
     Returns:
         The projected balance rounded to two decimal places.
     """
-    diff = better_kupa["tsua_mitztaberet_letkufa"] - current_kupa["tsua_mitztaberet_letkufa"]
+    diff = better_fund["tsua_mitztaberet_letkufa"] - current_fund["tsua_mitztaberet_letkufa"]
     potential = current_amount * (1 + diff / 100)
     return round(potential, 2)
 
@@ -259,12 +259,12 @@ def run_comparison(
     """Orchestrate the full fund comparison for all holdings in the Mislaka files.
 
     For each matched holding the function:
-    * filters peer kupot by fund type and risk level,
+    * filters peer funds by fund type and risk level,
     * applies the client's management fee,
     * normalises and grades every peer,
-    * builds a response payload with the client's kupa details, ranked
+    * builds a response payload with the client's fund details, ranked
       alternatives at the same risk level, and (if applicable) the best
-      available high-risk kupa as a ``golden`` option.
+      available high-risk fund as a ``golden`` option.
 
     Args:
         mislaka_file: List of decoded Mislaka XML file strings.
@@ -277,71 +277,71 @@ def run_comparison(
         A dict with a ``funds`` key containing a list of per-holding result
         dicts, each with ``client``, ``alternatives``, and ``golden`` keys.
     """
-    all_koput = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, [], remove_special_cases=False)
-    koput_to_suggest = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, bad_hevrot, remove_special_cases=True)
+    all_funds = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, [], remove_special_cases=False)
+    funds_to_suggest = parse_xml_file(GEMEL_NET_PATH, low_exposure_threshold, medium_exposure_threshold, bad_hevrot, remove_special_cases=True)
     mislaka_list = parse_multible_mislaka_files(mislaka_file)
-    matches = find_matching_kupot(mislaka_list, all_koput)
+    matches = find_matching_funds(mislaka_list, all_funds)
     funds_list = []
-    for mislaka, kupa in matches:
-        sug = kupa["SUG"]
-        koput_to_suggest.append(kupa)
-        our_koput = [k for k in koput_to_suggest if k["SUG"] == sug]
-        risk_level = kupa["risk_level"]
+    for mislaka, fund in matches:
+        sug = fund["SUG"]
+        funds_to_suggest.append(fund)
+        our_funds = [f for f in funds_to_suggest if f["SUG"] == sug]
+        risk_level = fund["risk_level"]
         dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
-        all_kopot_in_risk_level = get_kupot_by_risk_level(our_koput, risk_level)
-        adjusted_kupot = apply_dmey_nihul(copy.deepcopy(all_kopot_in_risk_level), dmey_nihul)
-        normalize_data(adjusted_kupot)
-        sorted_kupot = add_grade_and_sort(adjusted_kupot, weight_1, weight_3, weight_5, weight_sharp)
-        top_3 = get_top_3(sorted_kupot)
-        client_ranking, total_kupot = get_client_ranking(sorted_kupot, kupa["ID"])
-        for i in sorted_kupot:
-            if i["ID"] == kupa["ID"]:
-                client_kupa = i
+        all_funds_in_risk_level = get_funds_by_risk_level(our_funds, risk_level)
+        adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_risk_level), dmey_nihul)
+        normalize_data(adjusted_funds)
+        sorted_funds = add_grade_and_sort(adjusted_funds, weight_1, weight_3, weight_5, weight_sharp)
+        top_3 = get_top_3(sorted_funds)
+        client_ranking, total_funds = get_client_ranking(sorted_funds, fund["ID"])
+        for i in sorted_funds:
+            if i["ID"] == fund["ID"]:
+                client_fund = i
                 break
         default_sorted = add_grade_and_sort(
-            copy.deepcopy(adjusted_kupot),
+            copy.deepcopy(adjusted_funds),
             DEFAULT_WEIGHT_1, DEFAULT_WEIGHT_3, DEFAULT_WEIGHT_5, DEFAULT_WEIGHT_SHARP,
         )
         for i in default_sorted:
-            if i["ID"] == kupa["ID"]:
-                default_client_kupa = i
+            if i["ID"] == fund["ID"]:
+                default_client_fund = i
                 break
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
         if money == 0:
             continue
 
         client = {
-            "name": client_kupa["shem_kupa"],
-            "id": client_kupa["ID"],
+            "name": client_fund["fund_name"],
+            "id": client_fund["ID"],
             "client_id": mislaka.get("MISPAR-ZIHUY-LAKOACH", "unknown"),
-            "grade": client_kupa["grade"],
-            "default_grade": default_client_kupa["grade"],
+            "grade": client_fund["grade"],
+            "default_grade": default_client_fund["grade"],
             "rank": client_ranking,
-            "total_in_risk": total_kupot,
+            "total_in_risk": total_funds,
             "risk_level": risk_level,
             "amount": money,
             "dmei_nihul": dmey_nihul,
-            "tsua_1": round(client_kupa["tsua_mitztaberet_letkufa"], 2),
-            "tsua_3": round(client_kupa["tsua_3"], 2),
-            "tsua_5": round(client_kupa["tsua_5"], 2),
-            "hevra": client_kupa["hevra"],
+            "tsua_1": round(client_fund["tsua_mitztaberet_letkufa"], 2),
+            "tsua_3": round(client_fund["tsua_3"], 2),
+            "tsua_5": round(client_fund["tsua_5"], 2),
+            "hevra": client_fund["hevra"],
             "seniority_date": mislaka["TAARICH-HITZTARFUT-MUTZAR"],
-            "percentile": round((total_kupot - client_ranking) / total_kupot * 100),
-            "equity_exposure": client_kupa.get("equity_exposure"),
+            "percentile": round((total_funds - client_ranking) / total_funds * 100),
+            "equity_exposure": client_fund.get("equity_exposure"),
         }
 
         golden = {}
         if risk_level != "high":
-            all_koput_in_high_risk_level = get_kupot_by_risk_level(our_koput, "high")
-            golden_adjusted_koput = apply_dmey_nihul(copy.deepcopy(all_koput_in_high_risk_level), dmey_nihul)
-            normalize_data(golden_adjusted_koput)
-            golden_sorted_kupot = add_grade_and_sort(
-                golden_adjusted_koput, weight_1, weight_3, weight_5, weight_sharp
+            all_funds_in_high_risk_level = get_funds_by_risk_level(our_funds, "high")
+            golden_adjusted_funds = apply_dmey_nihul(copy.deepcopy(all_funds_in_high_risk_level), dmey_nihul)
+            normalize_data(golden_adjusted_funds)
+            golden_sorted_funds = add_grade_and_sort(
+                golden_adjusted_funds, weight_1, weight_3, weight_5, weight_sharp
             )
-            better_gold = get_top_3(golden_sorted_kupot)[0]
-            potential_amount_gold = calculate_potential_amount(money, client_kupa, better_gold)
+            better_gold = get_top_3(golden_sorted_funds)[0]
+            potential_amount_gold = calculate_potential_amount(money, client_fund, better_gold)
             golden = {
-                "name": better_gold["shem_kupa"],
+                "name": better_gold["fund_name"],
                 "id": better_gold["ID"],
                 "grade": better_gold["grade"],
                 "rank": 1,
@@ -355,27 +355,27 @@ def run_comparison(
             }
 
         alternatives = []
-        kupa_rank = 1
-        for better_kupa in top_3:
-            if better_kupa["ID"] != client_kupa["ID"]:
-                potential_amount = calculate_potential_amount(money, client_kupa, better_kupa)
+        fund_rank = 1
+        for better_fund in top_3:
+            if better_fund["ID"] != client_fund["ID"]:
+                potential_amount = calculate_potential_amount(money, client_fund, better_fund)
                 alt = {
-                    "name": better_kupa["shem_kupa"],
-                    "id": better_kupa["ID"],
-                    "grade": better_kupa["grade"],
-                    "rank": kupa_rank,
-                    "hevra": better_kupa["hevra"],
-                    "tsua_1": round(better_kupa["tsua_mitztaberet_letkufa"], 2),
-                    "tsua_3": round(better_kupa["tsua_3"], 2),
-                    "tsua_5": round(better_kupa["tsua_5"], 2),
+                    "name": better_fund["fund_name"],
+                    "id": better_fund["ID"],
+                    "grade": better_fund["grade"],
+                    "rank": fund_rank,
+                    "hevra": better_fund["hevra"],
+                    "tsua_1": round(better_fund["tsua_mitztaberet_letkufa"], 2),
+                    "tsua_3": round(better_fund["tsua_3"], 2),
+                    "tsua_5": round(better_fund["tsua_5"], 2),
                     "potential_amount": potential_amount,
                     "diff": round(potential_amount - money, 2),
                     "diff_percent": round((potential_amount - money) / money * 100, 1),
                 }
                 alternatives.append(alt)
-            kupa_rank += 1
+            fund_rank += 1
 
         funds_list.append({"client": client, "alternatives": alternatives, "golden": golden})
-        koput_to_suggest.remove(kupa)
+        funds_to_suggest.remove(fund)
 
     return {"funds": funds_list}
