@@ -228,25 +228,30 @@ def get_client_ranking(
 
 
 def calculate_potential_amount(
-    current_amount: float, current_fund: dict, better_fund: dict
+    current_amount: float, current_fund: dict, better_fund: dict,
+    field: str = "tsua_mitztaberet_letkufa",
+    years: int = 1,
 ) -> float:
     """Estimate the portfolio value if the client switched to a better fund.
 
-    The projection applies the difference in 1-year cumulative returns between
-    the two funds to the client's current savings balance.
+    Compounds the annualised return difference over *years* years.
 
     Args:
         current_amount: The client's current accumulated savings balance.
-        current_fund: Dict for the client's current fund (must contain
-            ``tsua_mitztaberet_letkufa``).
-        better_fund: Dict for the comparison fund (must contain
-            ``tsua_mitztaberet_letkufa``).
+        current_fund: Dict for the client's current fund.
+        better_fund: Dict for the comparison fund.
+        field: Return field to use (default: 1-year cumulative return).
+        years: Number of years to compound the difference over.
 
     Returns:
         The projected balance rounded to two decimal places.
     """
-    diff = better_fund["tsua_mitztaberet_letkufa"] - current_fund["tsua_mitztaberet_letkufa"]
-    potential = current_amount * (1 + diff / 100)
+    current_return = current_fund[field]
+    better_return = better_fund[field]
+    denominator = (1 + current_return / 100) ** years
+    if denominator == 0:
+        return round(current_amount, 2)
+    potential = current_amount * (1 + better_return / 100) ** years / denominator
     return round(potential, 2)
 
 
@@ -348,7 +353,9 @@ def run_comparison(
                     golden_adjusted_funds, weight_1, weight_3, weight_5, weight_sharp
                 )
                 better_gold = get_top_3(golden_sorted_funds)[0]
-                potential_amount_gold = calculate_potential_amount(money, client_fund, better_gold)
+                potential_amount_gold   = calculate_potential_amount(money, client_fund, better_gold, field="tsua_mitztaberet_letkufa", years=1)
+                potential_amount_gold_3 = calculate_potential_amount(money, client_fund, better_gold, field="tsua_3", years=3)
+                potential_amount_gold_5 = calculate_potential_amount(money, client_fund, better_gold, field="tsua_5", years=5)
                 best_same_risk = next((f for f in sorted_funds if f["ID"] != client_fund["ID"]), None)
                 best_same_risk_potential = calculate_potential_amount(money, client_fund, best_same_risk) if best_same_risk else 0
                 if potential_amount_gold > best_same_risk_potential:
@@ -364,6 +371,12 @@ def run_comparison(
                         "potential_amount": potential_amount_gold,
                         "diff": round(potential_amount_gold - money, 2),
                         "diff_percent": round((potential_amount_gold - money) / money * 100, 1),
+                        "potential_amount_3": potential_amount_gold_3,
+                        "diff_3": round(potential_amount_gold_3 - money, 2),
+                        "diff_percent_3": round((potential_amount_gold_3 - money) / money * 100, 1),
+                        "potential_amount_5": potential_amount_gold_5,
+                        "diff_5": round(potential_amount_gold_5 - money, 2),
+                        "diff_percent_5": round((potential_amount_gold_5 - money) / money * 100, 1),
                     }
 
         alternatives = []
@@ -372,7 +385,9 @@ def run_comparison(
             if len(alternatives) >= 3:
                 break
             if better_fund["ID"] != client_fund["ID"]:
-                potential_amount = calculate_potential_amount(money, client_fund, better_fund)
+                potential_amount   = calculate_potential_amount(money, client_fund, better_fund, field="tsua_mitztaberet_letkufa", years=1)
+                potential_amount_3 = calculate_potential_amount(money, client_fund, better_fund, field="tsua_3", years=3)
+                potential_amount_5 = calculate_potential_amount(money, client_fund, better_fund, field="tsua_5", years=5)
                 alt = {
                     "name": better_fund["fund_name"],
                     "id": better_fund["ID"],
@@ -385,6 +400,12 @@ def run_comparison(
                     "potential_amount": potential_amount,
                     "diff": round(potential_amount - money, 2),
                     "diff_percent": round((potential_amount - money) / money * 100, 1),
+                    "potential_amount_3": potential_amount_3,
+                    "diff_3": round(potential_amount_3 - money, 2),
+                    "diff_percent_3": round((potential_amount_3 - money) / money * 100, 1),
+                    "potential_amount_5": potential_amount_5,
+                    "diff_5": round(potential_amount_5 - money, 2),
+                    "diff_percent_5": round((potential_amount_5 - money) / money * 100, 1),
                 }
                 alternatives.append(alt)
             fund_rank += 1

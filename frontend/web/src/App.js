@@ -96,13 +96,21 @@ function aggregateResults(results) {
     const newAmount = item.client.amount ?? 0;
     const recalcAlts = (item.alternatives ?? []).map(alt => ({
       ...alt,
-      potential_amount: newAmount * (1 + (alt.diff_percent ?? 0) / 100),
-      diff: newAmount * (alt.diff_percent ?? 0) / 100,
+      potential_amount:   newAmount * (1 + (alt.diff_percent   ?? 0) / 100),
+      diff:               newAmount * (alt.diff_percent   ?? 0) / 100,
+      potential_amount_3: newAmount * (1 + (alt.diff_percent_3 ?? 0) / 100),
+      diff_3:             newAmount * (alt.diff_percent_3 ?? 0) / 100,
+      potential_amount_5: newAmount * (1 + (alt.diff_percent_5 ?? 0) / 100),
+      diff_5:             newAmount * (alt.diff_percent_5 ?? 0) / 100,
     }));
     const golden = item.golden ? {
       ...item.golden,
-      potential_amount: newAmount * (1 + (item.golden.diff_percent ?? 0) / 100),
-      diff: newAmount * (item.golden.diff_percent ?? 0) / 100,
+      potential_amount:   newAmount * (1 + (item.golden.diff_percent   ?? 0) / 100),
+      diff:               newAmount * (item.golden.diff_percent   ?? 0) / 100,
+      potential_amount_3: newAmount * (1 + (item.golden.diff_percent_3 ?? 0) / 100),
+      diff_3:             newAmount * (item.golden.diff_percent_3 ?? 0) / 100,
+      potential_amount_5: newAmount * (1 + (item.golden.diff_percent_5 ?? 0) / 100),
+      diff_5:             newAmount * (item.golden.diff_percent_5 ?? 0) / 100,
     } : item.golden;
     return { ...item, alternatives: recalcAlts, golden };
   });
@@ -430,17 +438,52 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
 
 const DEFAULT_THRESHOLDS = { low: 25, medium: 75 };
 
-function RiskBandEditor({ low, medium, onChange }) {
+function RiskBandEditor({ low, medium, onChange, overrideRiskLevel, onOverrideRiskLevelChange }) {
   const isDefault = low === DEFAULT_THRESHOLDS.low && medium === DEFAULT_THRESHOLDS.medium;
 
-  const setLow = (val) => {
-    const v = Math.max(0, Math.min(val, medium - 5));
-    onChange({ low: v, medium });
+  const toggleOverride = (level) => {
+    onOverrideRiskLevelChange(overrideRiskLevel === level ? null : level);
   };
+  const barRef = useRef(null);
+  const dragging = useRef(null);
+  const lowRef = useRef(low);
+  const mediumRef = useRef(medium);
+  const onChangeRef = useRef(onChange);
+  lowRef.current = low;
+  mediumRef.current = medium;
+  onChangeRef.current = onChange;
 
-  const setMedium = (val) => {
-    const v = Math.max(low + 5, Math.min(val, 130));
-    onChange({ low, medium: v });
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!dragging.current || !barRef.current) return;
+      const rect = barRef.current.getBoundingClientRect();
+      const rawVal = Math.round(((e.clientX - rect.left) / rect.width) * 130);
+      if (dragging.current === 'low') {
+        const v = Math.max(0, Math.min(rawVal, mediumRef.current - 5));
+        onChangeRef.current({ low: v, medium: mediumRef.current });
+      } else {
+        const v = Math.max(lowRef.current + 5, Math.min(rawVal, 130));
+        onChangeRef.current({ low: lowRef.current, medium: v });
+      }
+    };
+    const handleMouseUp = () => {
+      dragging.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const startDrag = (which) => (e) => {
+    e.preventDefault();
+    dragging.current = which;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
   };
 
   const lowW  = (low / 130) * 100;
@@ -451,25 +494,52 @@ function RiskBandEditor({ low, medium, onChange }) {
     <div className="risk-band-editor">
 
       {/* ── Visual bar ── */}
-      <div className="risk-band-bar-wrap" dir="ltr">
+      <div className="risk-band-bar-wrap" dir="ltr" ref={barRef}>
         <div className="risk-band-bar">
-          <div className="risk-band-seg risk-band-seg--low"    style={{ width: `${lowW}%`  }}>
-            {lowW  >= 12 && <span className="risk-band-seg-label">נמוך</span>}
+          <div
+            className={`risk-band-seg risk-band-seg--low${overrideRiskLevel === 'low' ? ' risk-band-seg--selected' : ''}`}
+            style={{ width: `${lowW}%` }}
+            onClick={() => toggleOverride('low')}
+          >
+            {lowW >= 12 && <span className="risk-band-seg-label">נמוך</span>}
           </div>
-          <div className="risk-band-seg risk-band-seg--medium" style={{ width: `${medW}%`  }}>
-            {medW  >= 12 && <span className="risk-band-seg-label">בינוני</span>}
+          <div
+            className={`risk-band-seg risk-band-seg--medium${overrideRiskLevel === 'medium' ? ' risk-band-seg--selected' : ''}`}
+            style={{ width: `${medW}%` }}
+            onClick={() => toggleOverride('medium')}
+          >
+            {medW >= 12 && <span className="risk-band-seg-label">בינוני</span>}
           </div>
-          <div className="risk-band-seg risk-band-seg--high"   style={{ width: `${highW}%` }}>
+          <div
+            className={`risk-band-seg risk-band-seg--high${overrideRiskLevel === 'high' ? ' risk-band-seg--selected' : ''}`}
+            style={{ width: `${highW}%` }}
+            onClick={() => toggleOverride('high')}
+          >
             {highW >= 12 && <span className="risk-band-seg-label">גבוה</span>}
           </div>
         </div>
+        {overrideRiskLevel && (
+          <div className="risk-band-override-hint">
+            השוואה לקבוצת סיכון {overrideRiskLevel === 'low' ? 'נמוך' : overrideRiskLevel === 'medium' ? 'בינוני' : 'גבוה'} — לחץ שוב לביטול
+          </div>
+        )}
 
-        {/* Threshold markers */}
-        <div className="risk-band-marker" style={{ left: `${(low / 130) * 100}%` }}>
+        {/* Draggable threshold markers */}
+        <div
+          className="risk-band-marker risk-band-marker--draggable"
+          style={{ left: `${(low / 130) * 100}%` }}
+          onMouseDown={startDrag('low')}
+        >
+          <div className="risk-band-marker-handle" />
           <div className="risk-band-marker-line" />
           <div className="risk-band-marker-label">{low}%</div>
         </div>
-        <div className="risk-band-marker" style={{ left: `${(medium / 130) * 100}%` }}>
+        <div
+          className="risk-band-marker risk-band-marker--draggable"
+          style={{ left: `${(medium / 130) * 100}%` }}
+          onMouseDown={startDrag('medium')}
+        >
+          <div className="risk-band-marker-handle" />
           <div className="risk-band-marker-line" />
           <div className="risk-band-marker-label">{medium}%</div>
         </div>
@@ -494,37 +564,6 @@ function RiskBandEditor({ low, medium, onChange }) {
           <span className="risk-band-legend-text">
             <strong>גבוה</strong> — {medium}%–130% חשיפה
           </span>
-        </div>
-      </div>
-
-      {/* ── Controls ── */}
-      <div className="risk-band-controls">
-        <div className="risk-band-control">
-          <div className="risk-band-control-title">
-            <span className="risk-band-dot risk-band-dot--low" />
-            גבול נמוך ↔ בינוני
-          </div>
-          <div className="weight-stepper">
-            <button className="weight-btn" onClick={() => setLow(low - 5)} disabled={low <= 0}>−</button>
-            <span className="weight-val">{low}%</span>
-            <button className="weight-btn" onClick={() => setLow(low + 5)} disabled={low >= medium - 5}>+</button>
-          </div>
-          <div className="risk-band-control-hint">חשיפה מנייתית מתחת ל-{low}% = סיכון נמוך</div>
-        </div>
-
-        <div className="risk-band-divider" />
-
-        <div className="risk-band-control">
-          <div className="risk-band-control-title">
-            <span className="risk-band-dot risk-band-dot--high" />
-            גבול בינוני ↔ גבוה
-          </div>
-          <div className="weight-stepper">
-            <button className="weight-btn" onClick={() => setMedium(medium - 5)} disabled={medium <= low + 5}>−</button>
-            <span className="weight-val">{medium}%</span>
-            <button className="weight-btn" onClick={() => setMedium(medium + 5)} disabled={medium >= 130}>+</button>
-          </div>
-          <div className="risk-band-control-hint">חשיפה מנייתית מעל {medium}% = סיכון גבוה</div>
         </div>
       </div>
 
@@ -684,48 +723,15 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
             low={thresholds.low}
             medium={thresholds.medium}
             onChange={onThresholdsChange}
+            overrideRiskLevel={overrideRiskLevel}
+            onOverrideRiskLevelChange={onOverrideRiskLevelChange}
           />
         </div>
 
-        {/* ── Step 4: Override Risk Level ── */}
+        {/* ── Step 4: Aggregate ── */}
         <div className="upload-step-card">
           <div className="step-card-header">
             <div className="step-card-num">04</div>
-            <div className="step-card-label">קבוצת השוואה</div>
-            {overrideRiskLevel !== null && (
-              <button className="quick-action-btn quick-action-btn--reset" onClick={() => onOverrideRiskLevelChange(null)}>
-                ↺ ברירת מחדל
-              </button>
-            )}
-          </div>
-          <div className="risk-override-wrap">
-            <div className="risk-override-desc">
-              בברירת מחדל כל קופה מושווית לקופות ברמת הסיכון שלה. ניתן לבחור רמת סיכון קבועה להשוואה עבור כל הקופות — במצב זה לא יוצג אפשרות הזהב.
-            </div>
-            <div className="risk-override-options">
-              {[
-                { value: null,     label: 'ברירת מחדל', desc: 'לפי רמת סיכון הקופה' },
-                { value: 'low',    label: 'נמוך',        desc: 'השוואה לקבוצת סיכון נמוך' },
-                { value: 'medium', label: 'בינוני',      desc: 'השוואה לקבוצת סיכון בינוני' },
-                { value: 'high',   label: 'גבוה',        desc: 'השוואה לקבוצת סיכון גבוה' },
-              ].map(opt => (
-                <button
-                  key={String(opt.value)}
-                  className={`risk-override-btn${overrideRiskLevel === opt.value ? ' risk-override-btn--active' : ''}`}
-                  onClick={() => onOverrideRiskLevelChange(opt.value)}
-                >
-                  <span className="risk-override-btn-label">{opt.label}</span>
-                  <span className="risk-override-btn-desc">{opt.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Step 5: Aggregate ── */}
-        <div className="upload-step-card">
-          <div className="step-card-header">
-            <div className="step-card-num">05</div>
             <div className="step-card-label">איחוד קופות זהות</div>
           </div>
           <div className="aggregate-toggle-row">
@@ -748,10 +754,10 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           </div>
         </div>
 
-        {/* ── Step 6: Hevrot ── */}
+        {/* ── Step 5: Hevrot ── */}
         <div className="upload-step-card">
           <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setHevrotOpen(o => !o)}>
-            <div className="step-card-num">06</div>
+            <div className="step-card-num">05</div>
             <div className="step-card-label">בחירת חברות מנהלות</div>
             <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
               {hevrotOpen ? '▲ סגור' : '▼ פתח'}
@@ -811,14 +817,18 @@ function LoadingScreen({ step, progress }) {
 function FundResults({ data, weights, thresholds }) {
   const { client, alternatives, golden: gold } = data;
   const isNew = client.grade === 0;
+  const [returnPeriod, setReturnPeriod] = useState(1);
+  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
 
   const pct = client.percentile ?? 0;
   const isBelow = !isNew && pct < 50;
 
-  // Bar chart: proportional to actual tsua_1 values
-  const clientTsua1 = client.tsua_1 ?? 0;
-  const allTsua = [client.tsua_1, ...alternatives.map(a => a.tsua_1)].filter(v => v > 0);
+  // Bar chart: proportional to selected period's tsua
+  const tsуaField = returnPeriod === 1 ? 'tsua_1' : returnPeriod === 3 ? 'tsua_3' : 'tsua_5';
+  const clientTsua = (returnPeriod === 1 ? client.tsua_1 : returnPeriod === 3 ? client.tsua_3 : client.tsua_5) ?? 0;
+  const allTsua = [clientTsua, ...alternatives.map(a => (returnPeriod === 1 ? a.tsua_1 : returnPeriod === 3 ? a.tsua_3 : a.tsua_5) ?? 0)].filter(v => v > 0);
   const maxTsua = Math.max(...allTsua, 0.1);
+  const periodLabel = returnPeriod === 1 ? 'שנתית' : returnPeriod === 3 ? '3 שנים' : '5 שנים';
 
   // Best alternative for high-risk section
   const bestAlt = alternatives[0];
@@ -931,7 +941,7 @@ function FundResults({ data, weights, thresholds }) {
       <div className="chart-card">
         <div className="chart-header">
           <div>
-            <div className="chart-title">תשואה שנתית — השוואה לשוק</div>
+            <div className="chart-title">תשואה {periodLabel} — השוואה לשוק</div>
             <div className="chart-sub">{client.total_in_risk ?? '–'} קופות ברמת סיכון {riskLabel}</div>
           </div>
         </div>
@@ -949,14 +959,14 @@ function FundResults({ data, weights, thresholds }) {
             <div className="bar-track bar-track--client">
               <div
                 className={`bar-fill ${clientIsTop ? 'bar-fill--client' : 'bar-fill--red'}`}
-                style={{ width: clientTsua1 > 0 ? `${(clientTsua1 / maxTsua) * 100}%` : '5%' }}
+                style={{ width: clientTsua > 0 ? `${(clientTsua / maxTsua) * 100}%` : '5%' }}
               >
-                <span className="bar-pct">{clientTsua1 > 0 ? `${fmtDec(clientTsua1)}%` : '—'}</span>
+                <span className="bar-pct">{clientTsua > 0 ? `${fmtDec(clientTsua)}%` : '—'}</span>
               </div>
             </div>
           </div>
           {alternatives.map((alt, i) => {
-            const tsua = alt.tsua_1 ?? 0;
+            const tsua = (returnPeriod === 1 ? alt.tsua_1 : returnPeriod === 3 ? alt.tsua_3 : alt.tsua_5) ?? 0;
             const altRank = sortedFunds.findIndex(f => f.id === alt.id) + 1;
             const rankColorIdx = altRank - 1;
             return (
@@ -993,7 +1003,25 @@ function FundResults({ data, weights, thresholds }) {
               <tr>
                 <th>#</th>
                 <th>שם הקופה</th>
-                <th>תשואה שנתית</th>
+                <th style={{ position: 'relative' }}>
+                  <button className="period-picker-btn" onClick={() => setPeriodPickerOpen(o => !o)}>
+                    {returnPeriod === 1 ? 'תשואה שנתית' : returnPeriod === 3 ? 'תשואה 3 שנים' : 'תשואה 5 שנים'}
+                    <span className="period-picker-arrow">{periodPickerOpen ? '▲' : '▼'}</span>
+                  </button>
+                  {periodPickerOpen && (
+                    <div className="period-picker-dropdown">
+                      {[1, 3, 5].map(p => (
+                        <button
+                          key={p}
+                          className={`period-picker-option${returnPeriod === p ? ' period-picker-option--active' : ''}`}
+                          onClick={() => { setReturnPeriod(p); setPeriodPickerOpen(false); }}
+                        >
+                          {p === 1 ? 'שנה אחרונה' : `${p} שנים`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </th>
                 <th>AmoScore</th>
                 <th>פוטנציאל *</th>
                 <th>הפרש</th>
@@ -1002,7 +1030,10 @@ function FundResults({ data, weights, thresholds }) {
             <tbody>
               {sortedFunds.map((fund, idx) => {
                 const color = fundColors[idx];
-                const diffNeg = fund.diff != null && fund.diff < 0;
+                const potentialAmt = returnPeriod === 1 ? fund.potential_amount : returnPeriod === 3 ? fund.potential_amount_3 : fund.potential_amount_5;
+                const diffAmt      = returnPeriod === 1 ? fund.diff            : returnPeriod === 3 ? fund.diff_3            : fund.diff_5;
+                const diffPct      = returnPeriod === 1 ? fund.diff_percent    : returnPeriod === 3 ? fund.diff_percent_3    : fund.diff_percent_5;
+                const diffNeg = diffAmt != null && diffAmt < 0;
                 const isTopThree = !fund.isClient && idx < 3;
                 return (
                   <tr key={fund.id} className={fund.isClient ? (clientIsTop ? 'row-client' : 'row-client row-client--bad') : 'row-alt'}>
@@ -1023,18 +1054,20 @@ function FundResults({ data, weights, thresholds }) {
                         <div className={`td-name-tag ${clientIsTop ? 'td-name-tag--client' : 'td-name-tag--client-bad'}`}>הקופה שלך</div>
                       )}
                     </td>
-                    <td className="td-return" style={{ color }}>{fund.tsua_1 != null ? `${fmtDec(fund.tsua_1)}%` : 'N/A'}</td>
+                    <td className="td-return" style={{ color }}>
+                      {(() => { const v = returnPeriod === 1 ? fund.tsua_1 : returnPeriod === 3 ? fund.tsua_3 : fund.tsua_5; return v != null && v !== 0 ? `${fmtDec(v)}%` : 'N/A'; })()}
+                    </td>
                     <td className="td-score">{fund.grade ? fmtDec(fund.grade) : '–'}</td>
-                    <td className="td-potential">{fund.potential_amount != null ? `₪${fmt(fund.potential_amount)}` : '—'}</td>
+                    <td className="td-potential">{potentialAmt != null ? `₪${fmt(potentialAmt)}` : '—'}</td>
                     <td className="td-diff">
-                      {fund.diff != null ? (
+                      {diffAmt != null ? (
                         <div>
                           <span className="diff-badge" style={{ background: diffNeg ? 'rgba(239,68,68,0.15)' : undefined, color: diffNeg ? '#EF4444' : undefined }}>
-                            {diffNeg ? '' : '+'}₪{fmt(Math.abs(fund.diff))}
+                            {diffNeg ? '' : '+'}₪{fmt(Math.abs(diffAmt))}
                           </span>
-                          {fund.diff_percent != null && (
+                          {diffPct != null && (
                             <div className="diff-pct" style={{ color: diffNeg ? '#EF4444' : '#10B981' }}>
-                              {diffNeg ? '' : '+'}{fmtDec(fund.diff_percent)}%
+                              {diffNeg ? '' : '+'}{fmtDec(diffPct)}%
                             </div>
                           )}
                         </div>
