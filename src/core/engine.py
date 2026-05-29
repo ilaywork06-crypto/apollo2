@@ -232,19 +232,26 @@ def calculate_potential_amount(
     field: str = "tsua_mitztaberet_letkufa",
     years: int = 1,
 ) -> float:
-    """Estimate the portfolio value if the client switched to a better fund.
+    """Answer: "If I had migrated to the better fund N years ago, how much would I have today?"
 
-    Compounds the annualised return difference over *years* years.
+    Back-calculates the client's starting balance N years ago (by reversing the
+    current fund's return), then grows that same starting balance at the better
+    fund's historical rate for N years to produce a "today" value.
+
+    Equivalent formula:  current_amount × (1 + better_return%)^N
+                                         ──────────────────────────
+                                          (1 + current_return%)^N
 
     Args:
         current_amount: The client's current accumulated savings balance.
         current_fund: Dict for the client's current fund.
         better_fund: Dict for the comparison fund.
         field: Return field to use (default: 1-year cumulative return).
-        years: Number of years to compound the difference over.
+        years: How many years back to project (1 → 1-year return, 3 → 3-year, 5 → 5-year).
 
     Returns:
-        The projected balance rounded to two decimal places.
+        What the balance would be today had the client been in the better fund
+        for the past *years* years, rounded to two decimal places.
     """
     current_return = current_fund[field]
     better_return = better_fund[field]

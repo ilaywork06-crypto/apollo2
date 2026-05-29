@@ -1,7 +1,9 @@
-import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect, createContext, useContext } from 'react';
 import './App.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+
+const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -127,39 +129,7 @@ const formatDate = (dateStr) => {
   return `${day}/${month}/${year}`;
 };
 
-// ─── Stars Background ─────────────────────────────────────────────────────────
 
-function Stars() {
-  const stars = useMemo(() => Array.from({ length: 180 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 1.8 + 0.4,
-    opacity: Math.random() * 0.6 + 0.2,
-    duration: Math.random() * 4 + 2,
-    delay: Math.random() * 4,
-  })), []);
-
-  return (
-    <div className="stars-bg" aria-hidden="true">
-      {stars.map(s => (
-        <div
-          key={s.id}
-          className="star"
-          style={{
-            left: `${s.x}%`,
-            top: `${s.y}%`,
-            width: `${s.size}px`,
-            height: `${s.size}px`,
-            opacity: s.opacity,
-            animationDuration: `${s.duration}s`,
-            animationDelay: `${s.delay}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
 
 // ─── Gauge SVG ────────────────────────────────────────────────────────────────
 
@@ -186,7 +156,7 @@ function GaugeChart({ percentile, rank, total }) {
         <path
           d="M 13 65 A 52 52 0 0 1 117 65"
           fill="none"
-          stroke="#1E293B"
+          stroke="var(--border)"
           strokeWidth="10"
           strokeLinecap="round"
         />
@@ -201,10 +171,10 @@ function GaugeChart({ percentile, rank, total }) {
           />
         )}
         {/* Percentile number */}
-        <text x="65" y="50" textAnchor="middle" fill="#F8FAFC" fontSize="26" fontWeight="700" fontFamily="Rubik, sans-serif">
+        <text x="65" y="50" textAnchor="middle" fill="var(--text-primary)" fontSize="26" fontWeight="700" fontFamily="Rubik, sans-serif">
           {pct}
         </text>
-        <text x="65" y="67" textAnchor="middle" fill="#94A3B8" fontSize="10" fontFamily="Rubik, sans-serif">
+        <text x="65" y="67" textAnchor="middle" fill="var(--text-secondary)" fontSize="10" fontFamily="Rubik, sans-serif">
           {`אחוזון ${pct}`}
         </text>
       </svg>
@@ -220,14 +190,11 @@ function GaugeChart({ percentile, rank, total }) {
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 function Header({ onReset }) {
+  const { theme, toggleTheme } = useContext(ThemeContext);
   return (
     <header className="app-header">
       <div className="header-inner">
-        {onReset ? (
-          <button className="btn-back" onClick={onReset}>← ניתוח חדש</button>
-        ) : (
-          <div />
-        )}
+        {/* Logo — always on the left */}
         <div className="header-brand">
           <div className="header-logo">
             <svg width="34" height="42" viewBox="-3 -3 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -237,13 +204,9 @@ function Header({ onReset }) {
                   <stop offset="100%" stopColor="#3B82F6"/>
                 </linearGradient>
               </defs>
-              {/* Left leg */}
               <line x1="15" y1="2" x2="1" y2="34" stroke="url(#hg)" strokeWidth="4" strokeLinecap="round"/>
-              {/* Right leg */}
               <line x1="15" y1="2" x2="29" y2="34" stroke="url(#hg)" strokeWidth="4" strokeLinecap="round"/>
-              {/* Crossbar */}
               <line x1="7" y1="21" x2="23" y2="21" stroke="url(#hg)" strokeWidth="3.5" strokeLinecap="round"/>
-              {/* Peak accent dot */}
               <circle cx="15" cy="2" r="4" fill="#A78BFA"/>
             </svg>
           </div>
@@ -253,6 +216,21 @@ function Header({ onReset }) {
             </span>
             <span className="header-subtitle">ניתוח והשוואת קופות גמל</span>
           </div>
+        </div>
+
+        {/* Right side: back button (when present) + theme toggle */}
+        <div className="header-actions">
+          {onReset && (
+            <button className="btn-back" onClick={onReset}>← ניתוח חדש</button>
+          )}
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
+            aria-label={theme === 'dark' ? 'light mode' : 'dark mode'}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
       </div>
     </header>
@@ -638,7 +616,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 
   return (
     <div className="screen screen--upload">
-      <Stars />
+
       <Header />
       <div className="upload-content">
 
@@ -797,7 +775,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 function LoadingScreen({ step, progress }) {
   return (
     <div className="screen screen--loading">
-      <Stars />
+
       <Header />
       <div className="loading-content">
         <div className="loading-emoji">📊</div>
@@ -824,7 +802,6 @@ function FundResults({ data, weights, thresholds }) {
   const isBelow = !isNew && pct < 50;
 
   // Bar chart: proportional to selected period's tsua
-  const tsуaField = returnPeriod === 1 ? 'tsua_1' : returnPeriod === 3 ? 'tsua_3' : 'tsua_5';
   const clientTsua = (returnPeriod === 1 ? client.tsua_1 : returnPeriod === 3 ? client.tsua_3 : client.tsua_5) ?? 0;
   const allTsua = [clientTsua, ...alternatives.map(a => (returnPeriod === 1 ? a.tsua_1 : returnPeriod === 3 ? a.tsua_3 : a.tsua_5) ?? 0)].filter(v => v > 0);
   const maxTsua = Math.max(...allTsua, 0.1);
@@ -1606,7 +1583,7 @@ function InviteScreen({ results, onJoined, onBack }) {
 
   return (
     <div className="screen community-screen">
-      <Stars />
+
       <Header onReset={onBack} />
       <div className="community-content">
         <button className="back-btn community-back" onClick={onBack}>→ חזרה לתוצאות</button>
@@ -1705,7 +1682,7 @@ function LeaderboardScreen({ leaderboard, myProfile, onViewProfile, onBack }) {
 
   return (
     <div className="screen community-screen">
-      <Stars />
+
       <Header onReset={onBack} />
       <div className="community-content">
         <button className="back-btn community-back" onClick={onBack}>→ חזרה לתוצאות</button>
@@ -1831,7 +1808,7 @@ function ProfileScreen({ fakeName, myProfile, leaderboard, onBack }) {
 
   return (
     <div className="screen community-screen">
-      <Stars />
+
       <Header onReset={onBack} />
       <div className="community-content">
         <button className="back-btn community-back" onClick={onBack}>→ חזרה לטבלה</button>
@@ -1962,7 +1939,7 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
 
   return (
     <div className="screen screen--results">
-      <Stars />
+
       <Header onReset={onReset} />
       <div id="results-content" className="results-content">
 
@@ -2084,6 +2061,16 @@ function App() {
   const [myProfile, setMyProfile] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [selectedProfileName, setSelectedProfileName] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem('amo-theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('amo-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === 'dark' ? 'light' : 'dark');
+  }, []);
 
   const results = useMemo(() => {
     if (!rawResults) return null;
@@ -2199,95 +2186,103 @@ function App() {
     }
   };
 
-  if (screen === 'loading') {
-    return <LoadingScreen step={loadingStep} progress={progress} />;
-  }
-  if (screen === 'results') {
+  const screenContent = (() => {
+    if (screen === 'loading') {
+      return <LoadingScreen step={loadingStep} progress={progress} />;
+    }
+    if (screen === 'results') {
+      return (
+        <ResultsScreen
+          results={results}
+          weights={weights}
+          thresholds={thresholds}
+          onReset={() => setScreen('upload')}
+          onGoToInvite={() => setScreen('invite')}
+        />
+      );
+    }
+    if (screen === 'invite') {
+      return (
+        <InviteScreen
+          results={results}
+          onBack={() => setScreen('results')}
+          onJoined={async (profile) => {
+            setMyProfile(profile);
+            try {
+              const res = await fetch('http://localhost:8000/community/leaderboard');
+              const data = await res.json();
+              setLeaderboardData(data.profiles || []);
+            } catch (err) {
+              console.error(err);
+            }
+            setScreen('leaderboard');
+          }}
+        />
+      );
+    }
+    if (screen === 'leaderboard') {
+      return (
+        <LeaderboardScreen
+          leaderboard={leaderboardData}
+          myProfile={myProfile}
+          onBack={() => setScreen('results')}
+          onViewProfile={(fakeName) => {
+            setSelectedProfileName(fakeName);
+            setScreen('profile');
+          }}
+        />
+      );
+    }
+    if (screen === 'profile') {
+      return (
+        <ProfileScreen
+          fakeName={selectedProfileName}
+          myProfile={myProfile}
+          leaderboard={leaderboardData}
+          onBack={() => setScreen('leaderboard')}
+        />
+      );
+    }
+    if (screen === 'viewer' && viewingFile) {
+      return (
+        <div className="screen screen--viewer">
+    
+          <div className="viewer-header">
+            <button className="back-btn" onClick={() => setScreen('upload')}>→ חזרה</button>
+            <h2>תצוגת קובץ XML</h2>
+            <button className="export-word-btn" onClick={handleExportWord}>⬇ ייצא ל-Word</button>
+          </div>
+          <div className="viewer-card">
+            <TreeNode node={viewingFile.doc.documentElement} depth={0} />
+          </div>
+        </div>
+      );
+    }
     return (
-      <ResultsScreen
-        results={results}
+      <UploadScreen
+        mislakaFiles={mislakaFiles}
+        onMislakaFiles={setMislakaFiles}
+        onRemoveMislakaFile={handleRemoveMislakaFile}
+        onViewFile={handleViewFile}
         weights={weights}
+        onWeightsChange={setWeights}
         thresholds={thresholds}
-        onReset={() => setScreen('upload')}
-        onGoToInvite={() => setScreen('invite')}
+        onThresholdsChange={setThresholds}
+        sumSameFund={sumSameFund}
+        onSumSameFundChange={setSumSameFund}
+        badHevrot={badHevrot}
+        onBadHevrotChange={setBadHevrot}
+        overrideRiskLevel={overrideRiskLevel}
+        onOverrideRiskLevelChange={setOverrideRiskLevel}
+        onAnalyze={handleAnalyze}
       />
     );
-  }
-  if (screen === 'invite') {
-    return (
-      <InviteScreen
-        results={results}
-        onBack={() => setScreen('results')}
-        onJoined={async (profile) => {
-          setMyProfile(profile);
-          try {
-            const res = await fetch('http://localhost:8000/community/leaderboard');
-            const data = await res.json();
-            setLeaderboardData(data.profiles || []);
-          } catch (err) {
-            console.error(err);
-          }
-          setScreen('leaderboard');
-        }}
-      />
-    );
-  }
-  if (screen === 'leaderboard') {
-    return (
-      <LeaderboardScreen
-        leaderboard={leaderboardData}
-        myProfile={myProfile}
-        onBack={() => setScreen('results')}
-        onViewProfile={(fakeName) => {
-          setSelectedProfileName(fakeName);
-          setScreen('profile');
-        }}
-      />
-    );
-  }
-  if (screen === 'profile') {
-    return (
-      <ProfileScreen
-        fakeName={selectedProfileName}
-        myProfile={myProfile}
-        leaderboard={leaderboardData}
-        onBack={() => setScreen('leaderboard')}
-      />
-    );
-  }
-  if (screen === 'viewer' && viewingFile) {
-    return (
-      <div className="screen screen--viewer">
-        <Stars />
-        <div className="viewer-header">
-          <button className="back-btn" onClick={() => setScreen('upload')}>→ חזרה</button>
-          <h2>תצוגת קובץ XML</h2>
-          <button className="export-word-btn" onClick={handleExportWord}>⬇ ייצא ל-Word</button>
-        </div>
-        <div className="viewer-card">
-          <TreeNode node={viewingFile.doc.documentElement} depth={0} />
-        </div>
-      </div>
-    );
-  }
+  })();
+
   return (
-    <UploadScreen
-      mislakaFiles={mislakaFiles}
-      onMislakaFiles={setMislakaFiles}
-      onRemoveMislakaFile={handleRemoveMislakaFile}
-      onViewFile={handleViewFile}
-      weights={weights}
-      onWeightsChange={setWeights}
-      thresholds={thresholds}
-      onThresholdsChange={setThresholds}
-      sumSameFund={sumSameFund}
-      onSumSameFundChange={setSumSameFund}
-      badHevrot={badHevrot}
-      onBadHevrotChange={setBadHevrot}
-      overrideRiskLevel={overrideRiskLevel}
-      onOverrideRiskLevelChange={setOverrideRiskLevel}
-      onAnalyze={handleAnalyze}
-    />
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      {screenContent}
+    </ThemeContext.Provider>
   );
 }
 

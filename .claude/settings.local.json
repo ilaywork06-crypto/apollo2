@@ -11,7 +11,17 @@
       "Bash(git rm:*)",
       "Bash(git add:*)",
       "Bash(grep -E \"\\(package\\\\.json|README|\\\\.md$\\)\")",
-      "Bash(grep -E \"\\\\.py$\")"
+      "Bash(grep -E \"\\\\.py$\")",
+      "Bash(.venv/bin/python -c \"import pytest\")",
+      "Bash(uv sync *)",
+      "Bash(uv run *)",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(curl -s https://openclaw.ai/)",
+      "Bash(curl -sL https://openclaw.ai/)",
+      "Bash(curl -sL https://openclaw.ai/assets/Layout.wUUzETCH.css)",
+      "Bash(curl -sL https://openclaw.ai/assets/index@_@astro.CMibRDka.css)",
+      "Bash(grep -E '\\(--[\\\\w-]+:|color:|background:|#[0-9a-fA-F]{3,6}\\)')"
     ]
   }
 }
