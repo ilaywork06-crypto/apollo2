@@ -239,60 +239,107 @@ function Header({ onReset }) {
 
 // ─── Weights Form ─────────────────────────────────────────────────────────────
 
+const WEIGHT_SEGMENTS = [
+  { key: 'w1',     label: 'תשואה שנה',    gradient: 'linear-gradient(90deg,#059669,#10B981)', color: '#10B981' },
+  { key: 'w3',     label: 'תשואה 3 שנים', gradient: 'linear-gradient(90deg,#2563EB,#3B82F6)', color: '#3B82F6' },
+  { key: 'w5',     label: 'תשואה 5 שנים', gradient: 'linear-gradient(90deg,#7C3AED,#8B5CF6)', color: '#8B5CF6' },
+  { key: 'wSharp', label: 'Sharp Ratio',  gradient: 'linear-gradient(90deg,#D97706,#F59E0B)', color: '#F59E0B' },
+];
+
 function WeightsForm({ weights, onChange }) {
-  const fields = WEIGHT_FIELDS.map(f => f.field);
-  const sum = fields.reduce((s, f) => s + weights[f], 0);
-  const isValid = sum === 100;
+  const barRef = useRef(null);
+  const dragging = useRef(null);
+  const wRef = useRef(weights);
+  const onChangeRef = useRef(onChange);
+  wRef.current = weights;
+  onChangeRef.current = onChange;
 
-  const handleStep = (idx, delta) => {
-    const next = { ...weights };
-    const target = fields[idx];
-    const newVal = next[target] + delta;
-    if (newVal < 0 || newVal > 100) return;
+  const MIN = 0;
 
-    let remaining = delta;
-    let cursor = (idx + 1) % fields.length;
-    const visited = new Set([idx]);
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!dragging.current || !barRef.current) return;
+      const rect = barRef.current.getBoundingClientRect();
+      const raw = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      const w = wRef.current;
 
-    while (remaining !== 0 && !visited.has(cursor)) {
-      visited.add(cursor);
-      const cur = next[fields[cursor]];
-      if (remaining > 0) {
-        const take = Math.min(remaining, cur);
-        next[fields[cursor]] -= take;
-        remaining -= take;
-      } else {
-        const give = Math.min(-remaining, 100 - cur);
-        next[fields[cursor]] += give;
-        remaining += give;
+      if (dragging.current === 'd1') {
+        const v = Math.max(MIN, Math.min(raw, w.w1 + w.w3 - MIN));
+        onChangeRef.current({ ...w, w1: v, w3: w.w1 + w.w3 - v });
+      } else if (dragging.current === 'd2') {
+        const lo = w.w1 + MIN, hi = w.w1 + w.w3 + w.w5 - MIN;
+        const v = Math.max(lo, Math.min(raw, hi));
+        onChangeRef.current({ ...w, w3: v - w.w1, w5: w.w1 + w.w3 + w.w5 - v });
+      } else if (dragging.current === 'd3') {
+        const lo = w.w1 + w.w3 + MIN, hi = 100 - MIN;
+        const v = Math.max(lo, Math.min(raw, hi));
+        onChangeRef.current({ ...w, w5: v - w.w1 - w.w3, wSharp: 100 - v });
       }
-      if (remaining !== 0) cursor = (cursor + 1) % fields.length;
-    }
+    };
+    const handleMouseUp = () => {
+      dragging.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
-    if (remaining === 0) {
-      next[target] = newVal;
-      onChange(next);
-    }
+  const startDrag = (id) => (e) => {
+    e.preventDefault();
+    dragging.current = id;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
   };
+
+  const d1 = weights.w1;
+  const d2 = weights.w1 + weights.w3;
+  const d3 = weights.w1 + weights.w3 + weights.w5;
 
   return (
     <div className="weights-form">
-      <div className="weights-form-title">הגדרת משקלות לחישוב AmoScore</div>
-      <div className="weights-grid">
-        {WEIGHT_FIELDS.map(({ field, label }, idx) => (
-          <div key={field} className="weight-field">
-            <label className="weight-label">{label}</label>
-            <div className="weight-stepper">
-              <button className="weight-btn" onClick={() => handleStep(idx, -5)}>−</button>
-              <span className="weight-val">{weights[field]}%</span>
-              <button className="weight-btn" onClick={() => handleStep(idx, +5)}>+</button>
+      <div className="risk-band-bar-wrap" dir="ltr" ref={barRef}>
+        <div className="risk-band-bar">
+          {WEIGHT_SEGMENTS.map((seg) => (
+            <div
+              key={seg.key}
+              className="risk-band-seg"
+              style={{ width: `${weights[seg.key]}%`, background: seg.gradient }}
+            >
+              {weights[seg.key] >= 10 && (
+                <span className="risk-band-seg-label">{weights[seg.key]}%</span>
+              )}
             </div>
+          ))}
+        </div>
+
+        {[{ id: 'd1', pos: d1 }, { id: 'd2', pos: d2 }, { id: 'd3', pos: d3 }].map(({ id, pos }) => (
+          <div
+            key={id}
+            className="risk-band-marker risk-band-marker--draggable"
+            style={{ left: `${pos}%` }}
+            onMouseDown={startDrag(id)}
+          >
+            <div className="risk-band-marker-handle" />
+            <div className="risk-band-marker-line" />
+            <div className="risk-band-marker-label">{pos}%</div>
           </div>
         ))}
       </div>
-      <div className={`weights-sum${isValid ? ' weights-sum--valid' : ' weights-sum--invalid'}`}>
-        סכום: <strong>{sum}</strong>/100
-        {isValid ? ' ✓' : ` — נדרש בדיוק 100 (${sum < 100 ? `חסרים ${100 - sum}` : `עודף ${sum - 100}`})`}
+
+      <div className="risk-band-legend">
+        {WEIGHT_SEGMENTS.map((seg) => (
+          <div key={seg.key} className="risk-band-legend-item">
+            <span className="risk-band-dot" style={{ background: seg.color }} />
+            <span className="risk-band-legend-text">
+              <strong>{seg.label}</strong> — {weights[seg.key]}%
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -437,10 +484,10 @@ function RiskBandEditor({ low, medium, onChange, overrideRiskLevel, onOverrideRi
       const rect = barRef.current.getBoundingClientRect();
       const rawVal = Math.round(((e.clientX - rect.left) / rect.width) * 130);
       if (dragging.current === 'low') {
-        const v = Math.max(0, Math.min(rawVal, mediumRef.current - 5));
+        const v = Math.max(0, Math.min(rawVal, mediumRef.current));
         onChangeRef.current({ low: v, medium: mediumRef.current });
       } else {
-        const v = Math.max(lowRef.current + 5, Math.min(rawVal, 130));
+        const v = Math.max(lowRef.current, Math.min(rawVal, 130));
         onChangeRef.current({ low: lowRef.current, medium: v });
       }
     };
@@ -613,6 +660,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
   const hasFiles = mislakaFiles.length > 0;
   const isDefaultWeights = weights.w1 === DEFAULT_WEIGHTS.w1 && weights.w3 === DEFAULT_WEIGHTS.w3 && weights.w5 === DEFAULT_WEIGHTS.w5 && weights.wSharp === DEFAULT_WEIGHTS.wSharp;
   const [hevrotOpen, setHevrotOpen] = useState(false);
+  const [aggregateOpen, setAggregateOpen] = useState(false);
 
   return (
     <div className="screen screen--upload">
@@ -622,7 +670,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 
         {/* ── Hero ── */}
         <div className="hero">
-          <div className="hero-badge">✦ AmoSight · ניתוח קופות גמל חכם</div>
+          <div className="hero-badge">השוואת קופות גמל · AmoSight</div>
           <h1 className="hero-title">בדוק את הביצועים<br/>של הקופות שלך</h1>
           <p className="hero-sub">
             העלה קבצי XML מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופות שלך עומדת מול שוק הגמל
@@ -632,25 +680,22 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
         {/* ── Feature strip ── */}
         <div className="feature-strip">
           <div className="feature-item">
-            <div className="feature-icon" style={{background:'rgba(59,130,246,0.15)',border:'1px solid rgba(59,130,246,0.3)'}}>📊</div>
             <div className="feature-text">
-              <div className="feature-title">השוואה מול השוק</div>
+              <div className="feature-title">📊 השוואה מול השוק</div>
               <div className="feature-desc">דירוג מול כל הקופות ברמת הסיכון שלך</div>
             </div>
           </div>
           <div className="feature-divider" />
           <div className="feature-item">
-            <div className="feature-icon" style={{background:'rgba(16,185,129,0.15)',border:'1px solid rgba(16,185,129,0.3)'}}>🏆</div>
             <div className="feature-text">
-              <div className="feature-title">3 החלופות הטובות</div>
-              <div className="feature-desc">קופות עם AmoScore גבוה יותר</div>
+              <div className="feature-title">🏅 3 החלופות הטובות</div>
+              <div className="feature-desc">קופות עם ציון גבוה יותר</div>
             </div>
           </div>
           <div className="feature-divider" />
           <div className="feature-item">
-            <div className="feature-icon" style={{background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.3)'}}>💎</div>
             <div className="feature-text">
-              <div className="feature-title">מה החמצת?</div>
+              <div className="feature-title">💰 מה החמצת?</div>
               <div className="feature-desc">הפוטנציאל שאבדת ואיך לשחזר אותו</div>
             </div>
           </div>
@@ -663,7 +708,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
             <div className="step-card-label">העלאת קבצי מסלקה</div>
             {hasFiles && (
               <button className="quick-action-btn quick-action-btn--clear" onClick={() => onMislakaFiles([])}>
-                🗑 נקה הכל
+                נקה הכל
               </button>
             )}
           </div>
@@ -708,28 +753,33 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 
         {/* ── Step 4: Aggregate ── */}
         <div className="upload-step-card">
-          <div className="step-card-header">
+          <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setAggregateOpen(o => !o)}>
             <div className="step-card-num">04</div>
             <div className="step-card-label">איחוד קופות זהות</div>
+            <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
+              {aggregateOpen ? '▲ סגור' : '▼ פתח'}
+            </span>
           </div>
-          <div className="aggregate-toggle-row">
-            <div className="aggregate-toggle-info">
-              <div className="aggregate-toggle-title">סכום מופעים של אותה קופה</div>
-              <div className="aggregate-toggle-desc">
-                {sumSameFund
-                  ? 'מופעים מרובים של אותה קופה (לפי מספר קופה) יאוחדו וסכום הצבירות יסוכם'
-                  : 'כל מופע של קופה יוצג בנפרד, גם אם מספר הקופה זהה'}
+          {aggregateOpen && (
+            <div className="aggregate-toggle-row">
+              <div className="aggregate-toggle-info">
+                <div className="aggregate-toggle-title">סכום מופעים של אותה קופה</div>
+                <div className="aggregate-toggle-desc">
+                  {sumSameFund
+                    ? 'מופעים מרובים של אותה קופה (לפי מספר קופה) יאוחדו וסכום הצבירות יסוכם'
+                    : 'כל מופע של קופה יוצג בנפרד, גם אם מספר הקופה זהה'}
+                </div>
               </div>
+              <label className="fund-toggle">
+                <input
+                  type="checkbox"
+                  checked={sumSameFund}
+                  onChange={e => onSumSameFundChange(e.target.checked)}
+                />
+                <span className="fund-toggle-slider" />
+              </label>
             </div>
-            <label className="fund-toggle">
-              <input
-                type="checkbox"
-                checked={sumSameFund}
-                onChange={e => onSumSameFundChange(e.target.checked)}
-              />
-              <span className="fund-toggle-slider" />
-            </label>
-          </div>
+          )}
         </div>
 
         {/* ── Step 5: Hevrot ── */}
@@ -756,7 +806,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
             disabled={!ready}
             onClick={onAnalyze}
           >
-            🔍 הפעל ניתוח
+            הפעל ניתוח
           </button>
           <div className="analyze-status">
             {!hasFiles && <span className="analyze-status-item">· העלה לפחות קובץ אחד</span>}
@@ -820,9 +870,15 @@ function FundResults({ data, weights, thresholds }) {
   const clientEntry = {
     ...client,
     isClient: true,
-    potential_amount: client.amount,
-    diff: null,
-    diff_percent: null,
+    // For the client's own row the "potential" is always their current balance —
+    // they were already in this fund, so the realized amount equals client.amount
+    // for every horizon. diff is 0 (no gain vs staying put).
+    potential_amount:   client.amount,
+    potential_amount_3: client.amount,
+    potential_amount_5: client.amount,
+    diff: 0, diff_percent: 0,
+    diff_3: 0, diff_percent_3: 0,
+    diff_5: 0, diff_percent_5: 0,
   };
   const sortedFunds = [
     ...alternatives.map(a => ({ ...a, isClient: false })),
@@ -1037,7 +1093,7 @@ function FundResults({ data, weights, thresholds }) {
                     <td className="td-score">{fund.grade ? fmtDec(fund.grade) : '–'}</td>
                     <td className="td-potential">{potentialAmt != null ? `₪${fmt(potentialAmt)}` : '—'}</td>
                     <td className="td-diff">
-                      {diffAmt != null ? (
+                      {!fund.isClient && diffAmt != null ? (
                         <div>
                           <span className="diff-badge" style={{ background: diffNeg ? 'rgba(239,68,68,0.15)' : undefined, color: diffNeg ? '#EF4444' : undefined }}>
                             {diffNeg ? '' : '+'}₪{fmt(Math.abs(diffAmt))}
@@ -1063,9 +1119,8 @@ function FundResults({ data, weights, thresholds }) {
       <div className="bottom-cards-row">
         {bestAlt && (client.rank !== 1 || (gold && gold.potential_amount > client.amount)) && (bestAlt.potential_amount > client.amount) && (
           <div className="highrisk-card">
-            <div className="highrisk-icon">⚡</div>
             <div className="highrisk-body">
-              <div className="highrisk-title">מה החמצת?</div>
+              <div className="highrisk-title">⚡ מה החמצת?</div>
               <div className="highrisk-desc">
                 עם המעבר לקופה המובילה לפני שנה, יכולת הצבירה שלך הייתה גדלה ב-
                 <strong className="highrisk-pct"> {fmtDec(diffPct)}%</strong>
@@ -1095,9 +1150,8 @@ function FundResults({ data, weights, thresholds }) {
 
         {gold && gold.potential_amount != null && gold.potential_amount > client.amount && (
           <div className="gold-card">
-            <div className="gold-icon">🏆</div>
             <div className="gold-body">
-              <div className="gold-title">תפוח הזהב</div>
+              <div className="gold-title">🏆🍎 תפוח הזהב</div>
               <div className="gold-subtitle">מקום #1 ברמת סיכון גבוה</div>
               <div className="gold-desc">
                 אם היית עובר לקופה המובילה בסיכון הגבוה ביותר, הצבירה שלך הייתה גדלה ב-
@@ -1482,7 +1536,7 @@ function SummaryHero({ results }) {
 
   return (
     <div className="summary-hero">
-      <div className="summary-hero-label">סיכום כלל הקופות 💎</div>
+      <div className="summary-hero-label">📊 סיכום כלל הקופות</div>
 
       <div className="summary-hero-row">
         {/* Current */}
@@ -1589,8 +1643,7 @@ function InviteScreen({ results, onJoined, onBack }) {
         <button className="back-btn community-back" onClick={onBack}>→ חזרה לתוצאות</button>
 
         <div className="community-invite-hero">
-          <div className="community-trophy">🏆</div>
-          <h1 className="community-title">הצטרף לקהילת המשקיעים</h1>
+          <h1 className="community-title">🏆 הצטרף לקהילת המשקיעים</h1>
           <p className="community-subtitle">
             גלה איך הפורטפוליו שלך ביחס למשקיעים אחרים — בצורה אנונימית לחלוטין.<br />
             הפרופיל שלך יוצג עם שם בדוי בלבד. אף אחד לא יידע מי אתה.
@@ -1641,7 +1694,7 @@ function InviteScreen({ results, onJoined, onBack }) {
         </div>
 
         <button className="community-join-btn" onClick={handleJoin} disabled={joining}>
-          {joining ? '⏳ מצטרף...' : '🚀 הצטרף לקהילה'}
+          {joining ? 'מצטרף...' : 'הצטרף לקהילה'}
         </button>
         <p className="community-disclaimer-small">
           ניתן לעזוב בכל עת · המידע שלך מאוחסן באופן מקומי בלבד
@@ -1688,7 +1741,7 @@ function LeaderboardScreen({ leaderboard, myProfile, onViewProfile, onBack }) {
         <button className="back-btn community-back" onClick={onBack}>→ חזרה לתוצאות</button>
 
         <div className="leaderboard-hero">
-          <h1 className="community-title">🏆 טבלת המשקיעים</h1>
+          <h1 className="community-title">🏅 טבלת המשקיעים</h1>
           <div className="leaderboard-count">{(leaderboard || []).length} משקיעים בקהילה</div>
           <div className="leaderboard-weights-note">
             * AmoScore מחושב לפי משקלים קבועים: תשואה שנה 10% · תשואה 3 שנים 20% · תשואה 5 שנים 25% · Sharp Ratio 45%
@@ -2004,26 +2057,25 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
           </div>
         </div>
 
+        {onGoToInvite && (
+          <div className="community-invite-banner">
+            <div className="invite-banner-text">
+              <div className="invite-banner-title">🏅 רוצה לראות איך אתה ביחס למשקיעים אחרים?</div>
+              <div className="invite-banner-subtitle">הצטרף לקהילה האנונימית שלנו וגלה את הדירוג שלך</div>
+            </div>
+            <button className="invite-banner-btn" onClick={onGoToInvite}>הצטרף</button>
+          </div>
+        )}
+
         <div className="pdf-button-container">
           <button
             className="download-pdf-btn"
             onClick={handleDownloadPDF}
             disabled={pdfLoading}
           >
-            {pdfLoading ? '⏳ מפיק PDF...' : '📥 הורד דוח PDF'}
+            {pdfLoading ? 'מפיק PDF...' : 'הורד דוח PDF'}
           </button>
         </div>
-
-        {onGoToInvite && (
-          <div className="community-invite-banner">
-            <div className="invite-banner-icon">🏆</div>
-            <div className="invite-banner-text">
-              <div className="invite-banner-title">רוצה לראות איך אתה ביחס למשקיעים אחרים?</div>
-              <div className="invite-banner-subtitle">הצטרף לקהילה האנונימית שלנו וגלה את הדירוג שלך</div>
-            </div>
-            <button className="invite-banner-btn" onClick={onGoToInvite}>הצטרף</button>
-          </div>
-        )}
 
         <div className="portfolio-footer">
           נבנה ב ❤️ על ידי{' '}
