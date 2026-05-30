@@ -104,6 +104,8 @@ describe('App renders', () => {
 
   test('shows company blacklist checkboxes', () => {
     render(<App />);
+    // The hevrot panel is collapsed by default — open it first
+    fireEvent.click(screen.getByText('בחירת חברות מנהלות'));
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes.length).toBeGreaterThan(0);
   });
@@ -120,12 +122,10 @@ describe('App renders', () => {
     expect(btn).toBeDisabled();
   });
 
-  test('weight increment/decrement buttons are present (8 = 4 metrics × 2)', () => {
+  test('weight bar segments are present (4 metrics)', () => {
     render(<App />);
-    const minusButtons = screen.getAllByRole('button', { name: '−' });
-    const plusButtons = screen.getAllByRole('button', { name: '+' });
-    expect(minusButtons.length).toBe(4);
-    expect(plusButtons.length).toBe(4);
+    const segments = document.querySelectorAll('.weights-form .risk-band-seg');
+    expect(segments.length).toBe(4);
   });
 
   test('shows exposure threshold controls', () => {
@@ -147,26 +147,19 @@ describe('Weight controls', () => {
     expect(document.body.textContent).toMatch(/45/);
   });
 
-  test('clicking + increases weight display', async () => {
+  test('weight bar legend shows current weight percentages', () => {
     render(<App />);
-    const plusButtons = screen.getAllByRole('button', { name: '+' });
-    // Before click: first weight field should show its default
-    const textBefore = document.body.textContent;
-    fireEvent.click(plusButtons[0]);
-    await waitFor(() => {
-      const textAfter = document.body.textContent;
-      // Something changed
-      expect(textAfter).toBeTruthy();
-    });
+    // Legend renders each weight value as "label — X%"
+    expect(document.body.textContent).toMatch(/10%/);
+    expect(document.body.textContent).toMatch(/20%/);
+    expect(document.body.textContent).toMatch(/25%/);
+    expect(document.body.textContent).toMatch(/45%/);
   });
 
-  test('clicking − decreases weight display', async () => {
+  test('weight bar markers are rendered (3 dividers between 4 segments)', () => {
     render(<App />);
-    const minusButtons = screen.getAllByRole('button', { name: '−' });
-    fireEvent.click(minusButtons[3]); // click on last weight (45 → 40)
-    await waitFor(() => {
-      expect(document.body.textContent).toBeTruthy();
-    });
+    const markers = document.querySelectorAll('.weights-form .risk-band-marker--draggable');
+    expect(markers.length).toBe(3);
   });
 });
 
@@ -299,6 +292,7 @@ describe('Error handling', () => {
 describe('Company blacklist', () => {
   test('can toggle a company checkbox on and off', async () => {
     render(<App />);
+    fireEvent.click(screen.getByText('בחירת חברות מנהלות'));
     const checkboxes = screen.getAllByRole('checkbox');
     const first = checkboxes[0];
     const initialState = first.checked;
@@ -310,6 +304,7 @@ describe('Company blacklist', () => {
 
   test('at least one company is pre-selected by default', () => {
     render(<App />);
+    fireEvent.click(screen.getByText('בחירת חברות מנהלות'));
     const checkboxes = screen.getAllByRole('checkbox');
     const checked = Array.from(checkboxes).filter((cb) => cb.checked);
     expect(checked.length).toBeGreaterThan(0);
