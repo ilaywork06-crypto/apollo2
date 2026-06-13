@@ -10,6 +10,8 @@ def extract_track(
     polisa: ET._Element,
     tzvira_fees: dict[str, float],
     hafkada_fees: dict[str, float],
+    uniform_tzvira_fee: float,
+    uniform_hafkada_fee: float,
     *,
     shem_tochnit: str,
     taarich_hitztarfut_mutzar: str,
@@ -30,6 +32,10 @@ def extract_track(
         tzvira_fees: Accumulation-fee rates keyed by investment-track code
             (from :func:`src.parsers.mislaka.fee_resolver.map_dmey_nihul`).
         hafkada_fees: Deposit-fee rates keyed by investment-track code.
+        uniform_tzvira_fee: Policy-wide accumulation fee that applies when the
+            producer declares uniform fees but omits the per-track key (from
+            :func:`src.parsers.mislaka.fee_resolver.resolve_uniform_dmey_nihul`).
+        uniform_hafkada_fee: Policy-wide deposit fee, resolved the same way.
         shem_tochnit: The plan name for this policy.
         taarich_hitztarfut_mutzar: The product join date for this policy.
         kod_mezahe_yatzran: The producer identifier for this Mutzar.
@@ -50,6 +56,7 @@ def extract_track(
 
     FINAL_DMEI_NIHUL_TZVIRA = max(
         tzvira_fees.get(KOD_MASLUL_HASHKAA, 0.0),
+        uniform_tzvira_fee,
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON-MIVNE", maslul, float),
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON", maslul, float),
     )
@@ -59,6 +66,7 @@ def extract_track(
         )
     FINAL_DMEI_NIHUL_HAFKADA = max(
         hafkada_fees.get(KOD_MASLUL_HASHKAA, 0.0),
+        uniform_hafkada_fee,
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HAFKADA-MIVNE", polisa, float),
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HAFKADA", polisa, float),
     )

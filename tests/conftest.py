@@ -189,6 +189,46 @@ MINIMAL_MISLAKA_XML = """\
 </MislakaRoot>
 """
 
+# Mirrors the Harel pattern: track-level fee fields are absent and the
+# structure-level fee declares uniform fees (DMEI-NIHUL-ACHIDIM=1) without the
+# per-track KOD-MASLUL-HASHKAA-BAAL-DMEI-NIHUL-YECHUDIIM key, so only the
+# policy-wide uniform fallback can recover the 0.7 accumulation fee.
+MISLAKA_UNIFORM_FEE_XML = """\
+<MislakaRoot>
+  <YeshutLakoach>
+    <MISPAR-ZIHUY-LAKOACH>039985932</MISPAR-ZIHUY-LAKOACH>
+  </YeshutLakoach>
+  <Mutzar>
+    <KOD-MEZAHE-YATZRAN>UniformYatzran</KOD-MEZAHE-YATZRAN>
+    <HeshbonOPolisa>
+      <SHEM-TOCHNIT>Uniform Fee Plan</SHEM-TOCHNIT>
+      <TAARICH-HITZTARFUT-MUTZAR>10/08/2022</TAARICH-HITZTARFUT-MUTZAR>
+      <PirteiTaktziv>
+        <PerutMasluleiHashkaa>
+          <SCHUM-TZVIRA-BAMASLUL>19441.11</SCHUM-TZVIRA-BAMASLUL>
+          <KOD-MASLUL-HASHKAA>512267592000000000001540000154</KOD-MASLUL-HASHKAA>
+          <SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH>0.00</SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH>
+        </PerutMasluleiHashkaa>
+      </PirteiTaktziv>
+      <PerutHotzaot>
+        <MivneDmeiNihul>
+          <PerutMivneDmeiNihul>
+            <SUG-HOTZAA>1</SUG-HOTZAA>
+            <SHEUR-DMEI-NIHUL>0.7000</SHEUR-DMEI-NIHUL>
+            <DMEI-NIHUL-ACHIDIM>1</DMEI-NIHUL-ACHIDIM>
+          </PerutMivneDmeiNihul>
+          <PerutMivneDmeiNihul>
+            <SUG-HOTZAA>2</SUG-HOTZAA>
+            <SHEUR-DMEI-NIHUL>0.0000</SHEUR-DMEI-NIHUL>
+            <DMEI-NIHUL-ACHIDIM>1</DMEI-NIHUL-ACHIDIM>
+          </PerutMivneDmeiNihul>
+        </MivneDmeiNihul>
+      </PerutHotzaot>
+    </HeshbonOPolisa>
+  </Mutzar>
+</MislakaRoot>
+"""
+
 MISLAKA_TWO_TRACKS_XML = """\
 <MislakaRoot>
   <YeshutLakoach>

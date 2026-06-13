@@ -3,7 +3,11 @@
 import pytest
 
 from src.parsers.mislaka.parser import parse_mislaka_file, parse_multible_mislaka_files
-from tests.conftest import MINIMAL_MISLAKA_XML, MISLAKA_TWO_TRACKS_XML
+from tests.conftest import (
+    MINIMAL_MISLAKA_XML,
+    MISLAKA_TWO_TRACKS_XML,
+    MISLAKA_UNIFORM_FEE_XML,
+)
 
 
 class TestParseMislakaFile:
@@ -62,6 +66,15 @@ class TestParseMislakaFile:
         # "001001" -> int -> str = "1001"
         assert result[0]["GEMELNET_ID"] == "1001"
         assert not result[0]["GEMELNET_ID"].startswith("0")
+
+    def test_recovers_uniform_fee_without_per_track_key(self):
+        # Harel-style file: no track-level fee fields and the structure-level
+        # fee declares uniform fees (DMEI-NIHUL-ACHIDIM=1) without the per-track
+        # key, so the fee must be recovered from the policy-wide fallback.
+        result = parse_mislaka_file(MISLAKA_UNIFORM_FEE_XML)
+        assert len(result) == 1
+        assert result[0]["SHEUR-DMEI-NIHUL-TZVIRA"] == pytest.approx(0.7)
+        assert result[0]["SHEUR-DMEI-NIHUL-HAFKADA"] == pytest.approx(0.0)
 
 
 class TestParseMultipleMislakaFiles:

@@ -2,7 +2,7 @@
 
 import lxml.etree as ET
 
-from src.parsers.mislaka.fee_resolver import map_dmey_nihul
+from src.parsers.mislaka.fee_resolver import map_dmey_nihul, resolve_uniform_dmey_nihul
 
 
 FEE_STRUCTURE_XML = """\
@@ -49,3 +49,61 @@ class TestMapDmeyNihul:
     def test_empty_root_returns_empty(self):
         root = ET.fromstring(b"<MislakaRoot></MislakaRoot>")
         assert map_dmey_nihul(root, 1) == {}
+
+
+# Harel-style policy: uniform fees declared (DMEI-NIHUL-ACHIDIM=1) with no
+# per-track KOD-MASLUL-HASHKAA-BAAL-DMEI-NIHUL-YECHUDIIM key.
+UNIFORM_FEE_POLISA_XML = """\
+<HeshbonOPolisa>
+  <PerutHotzaot>
+    <MivneDmeiNihul>
+      <PerutMivneDmeiNihul>
+        <SUG-HOTZAA>1</SUG-HOTZAA>
+        <SHEUR-DMEI-NIHUL>0.7</SHEUR-DMEI-NIHUL>
+        <DMEI-NIHUL-ACHIDIM>1</DMEI-NIHUL-ACHIDIM>
+      </PerutMivneDmeiNihul>
+      <PerutMivneDmeiNihul>
+        <SUG-HOTZAA>2</SUG-HOTZAA>
+        <SHEUR-DMEI-NIHUL>0.0</SHEUR-DMEI-NIHUL>
+        <DMEI-NIHUL-ACHIDIM>1</DMEI-NIHUL-ACHIDIM>
+      </PerutMivneDmeiNihul>
+    </MivneDmeiNihul>
+  </PerutHotzaot>
+</HeshbonOPolisa>
+"""
+
+# Non-uniform policy: fees differ per track (DMEI-NIHUL-ACHIDIM=2), so the
+# uniform fallback must NOT apply.
+NON_UNIFORM_FEE_POLISA_XML = """\
+<HeshbonOPolisa>
+  <PerutHotzaot>
+    <MivneDmeiNihul>
+      <PerutMivneDmeiNihul>
+        <SUG-HOTZAA>1</SUG-HOTZAA>
+        <SHEUR-DMEI-NIHUL>0.7</SHEUR-DMEI-NIHUL>
+        <DMEI-NIHUL-ACHIDIM>2</DMEI-NIHUL-ACHIDIM>
+      </PerutMivneDmeiNihul>
+    </MivneDmeiNihul>
+  </PerutHotzaot>
+</HeshbonOPolisa>
+"""
+
+
+class TestResolveUniformDmeyNihul:
+    def test_returns_uniform_accumulation_fee(self):
+        polisa = ET.fromstring(UNIFORM_FEE_POLISA_XML.encode("utf-8"))
+        assert resolve_uniform_dmey_nihul(polisa, 1) == 0.7
+
+    def test_returns_uniform_deposit_fee(self):
+        polisa = ET.fromstring(UNIFORM_FEE_POLISA_XML.encode("utf-8"))
+        assert resolve_uniform_dmey_nihul(polisa, 2) == 0.0
+
+    def test_ignores_non_uniform_fees(self):
+        # DMEI-NIHUL-ACHIDIM=2 means fees genuinely differ per track, so no
+        # policy-wide fallback should be produced.
+        polisa = ET.fromstring(NON_UNIFORM_FEE_POLISA_XML.encode("utf-8"))
+        assert resolve_uniform_dmey_nihul(polisa, 1) == 0.0
+
+    def test_no_fee_structure_returns_zero(self):
+        polisa = ET.fromstring(b"<HeshbonOPolisa></HeshbonOPolisa>")
+        assert resolve_uniform_dmey_nihul(polisa, 1) == 0.0

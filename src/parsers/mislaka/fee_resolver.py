@@ -28,3 +28,34 @@ def map_dmey_nihul(root: ET._Element, sug: int) -> dict[str, float]:
             result[kod] = dmey
             result[kod2] = dmey
     return result
+
+
+def resolve_uniform_dmey_nihul(polisa: ET._Element, sug: int) -> float:
+    """Resolve the management-fee rate for a policy that declares uniform fees.
+
+    When a producer marks ``DMEI-NIHUL-ACHIDIM = 1`` (fees are uniform across
+    all investment tracks), the Mislaka spec makes the per-track key
+    ``KOD-MASLUL-HASHKAA-BAAL-DMEI-NIHUL-YECHUDIIM`` optional -- it is only
+    required when fees differ between tracks (``DMEI-NIHUL-ACHIDIM = 2``). Some
+    producers (e.g. Harel) omit that key entirely, so the keyed lookup built by
+    :func:`map_dmey_nihul` cannot find the rate and the track is left with a
+    zero fee. In that situation the single ``SHEUR-DMEI-NIHUL`` rate applies to
+    every track in the policy, so this recovers it as a policy-wide fallback.
+
+    Args:
+        polisa: A ``HeshbonOPolisa`` element whose ``PerutMivneDmeiNihul``
+            fee-structure rows are inspected.
+        sug: Expense-type code to filter on (``1`` = accumulation fee,
+            ``2`` = deposit fee).
+
+    Returns:
+        The highest uniform fee rate declared for the requested expense type,
+        or ``0.0`` when the policy declares no uniform fee for it.
+    """
+    result = 0.0
+    for row in polisa.iter("PerutMivneDmeiNihul"):
+        if extract_data_from_xml(".//SUG-HOTZAA", row, int) != sug:
+            continue
+        if extract_data_from_xml(".//DMEI-NIHUL-ACHIDIM", row, int) == 1:
+            result = max(result, extract_data_from_xml(".//SHEUR-DMEI-NIHUL", row, float))
+    return result

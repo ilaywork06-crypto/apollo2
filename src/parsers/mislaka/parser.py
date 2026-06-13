@@ -6,7 +6,7 @@ import re
 
 import lxml.etree as ET
 
-from src.parsers.mislaka.fee_resolver import map_dmey_nihul
+from src.parsers.mislaka.fee_resolver import map_dmey_nihul, resolve_uniform_dmey_nihul
 from src.parsers.mislaka.track_extractor import extract_track
 from src.parsers.xml_utils import extract_data_from_xml
 
@@ -76,6 +76,11 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                 ".//TAARICH-HITZTARFUT-MUTZAR", polisa
             )
 
+            # Policy-wide fallback for producers that declare uniform fees but
+            # omit the per-track key the structure-level lookup relies on.
+            uniform_tzvira_fee = resolve_uniform_dmey_nihul(polisa, 1)
+            uniform_hafkada_fee = resolve_uniform_dmey_nihul(polisa, 2)
+
             maslulim = polisa.findall(".//PirteiTaktziv/PerutMasluleiHashkaa")
             if not maslulim:
                 maslulim = [polisa]
@@ -83,6 +88,7 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
             for maslul in maslulim:
                 track = extract_track(
                     maslul, polisa, dmey_nihul_tsvira_map, dmey_nihul_hafkada_map,
+                    uniform_tzvira_fee, uniform_hafkada_fee,
                     shem_tochnit=SHEM_TOCHNIT,
                     taarich_hitztarfut_mutzar=TAARICH_HITZTARFUT_MUTZAR,
                     kod_mezahe_yatzran=KOD_MEZAHE_YATZRAN,
