@@ -8,15 +8,11 @@ import copy
 
 import pytest
 
-from src.core.engine import (
-    add_grade_and_sort,
-    apply_dmey_nihul,
-    find_matching_funds,
-    get_client_ranking,
-    get_funds_by_risk_level,
-    get_top_3,
-    normalize_data,
-)
+from src.comparison.fees import apply_dmey_nihul
+from src.comparison.grading import add_grade_and_sort, get_top_3
+from src.comparison.matching import find_matching_funds, get_funds_by_risk_level
+from src.comparison.normalization import normalize_data
+from src.comparison.ranking import get_client_ranking
 from tests.conftest import make_fund, make_mislaka
 
 

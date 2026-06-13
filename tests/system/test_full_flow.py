@@ -7,7 +7,8 @@ Fund 103 = medium risk (equity 46.44%), Fund 127 = high risk (equity 99.27%).
 
 import pytest
 
-from src.core.engine import GEMEL_NET_PATH, RISKS_MAP_PATH, run_comparison
+from src.comparison.config import GEMEL_NET_PATH, RISKS_MAP_PATH
+from src.comparison.service import run_comparison
 
 # Skip the whole module if the real data files are absent (e.g. CI without data)
 pytestmark = pytest.mark.skipif(

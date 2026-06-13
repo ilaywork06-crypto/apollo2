@@ -5,25 +5,19 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from src.core.risk_classifier import get_equity_exposure, get_risk_level
+from src.comparison.risk_classifier import RiskClassifier
 from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
 
-def remove_bad_hevrot(list_of_funds: list[dict], bad_hevrot: list[str]) -> list[dict]:
-    """Remove records with invalid or excluded company names.
 
-    Args:
-        list_of_funds: A list of fund dicts, each containing a ``hevra`` key.
-        bad_hevrot: A set of company names to exclude.
-
-    Returns:
-        A filtered list of fund dicts, excluding those whose ``hevra`` value
-        is in the predefined set of bad company names.
-    """
-    return [fund for fund in list_of_funds if fund["hevra"] not in bad_hevrot]
-
-def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_threshold: int, bad_hevrot: list[str], remove_special_cases: bool) -> list[dict]:
+def parse_xml_file(
+    content: Path,
+    low_exposure_threshold: int,
+    medium_exposure_threshold: int,
+    risk_classifier: RiskClassifier,
+    remove_special_cases: bool,
+) -> list[dict]:
     """Parse the GemeNet funds XML file and return a list of fund records.
 
     Only rows whose ``UCHLUSIYAT_YAAD`` field equals ``"כלל האוכלוסיה"``
@@ -34,6 +28,10 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
         content: Path to the GemeNet XML file to parse.
         low_exposure_threshold: The threshold for low equity exposure.
         medium_exposure_threshold: The threshold for medium equity exposure.
+        risk_classifier: Classifier used to derive each fund's risk level and
+            equity exposure.
+        remove_special_cases: When ``True``, only rows for the general
+            population are included.
 
     Returns:
         A list of dicts, each representing one fund with the following keys:
@@ -66,8 +64,8 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
             row,
             float,
         )
-        RISK_LEVEL = get_risk_level(int(ID), low_exposure_threshold, medium_exposure_threshold)
-        EQUITY_EXPOSURE = get_equity_exposure(int(ID))
+        RISK_LEVEL = risk_classifier.get_risk_level(int(ID), low_exposure_threshold, medium_exposure_threshold)
+        EQUITY_EXPOSURE = risk_classifier.get_equity_exposure(int(ID))
         TSUA_MITZTABERET_LETKUFA = extract_data_from_xml(
             "TSUA_MITZTABERET_LETKUFA",
             row,
@@ -97,4 +95,4 @@ def parse_xml_file(content: Path, low_exposure_threshold: int, medium_exposure_t
             }
         )
 
-    return remove_bad_hevrot(list_of_funds, bad_hevrot)
+    return list_of_funds

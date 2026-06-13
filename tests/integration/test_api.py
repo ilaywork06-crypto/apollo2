@@ -38,7 +38,7 @@ def client():
     mock_pool, _ = _make_pool()
     with (
         patch("asyncpg.create_pool", AsyncMock(return_value=mock_pool)),
-        patch("src.community.init_db", AsyncMock()),
+        patch("src.community.repository.ProfileRepository.init_schema", AsyncMock()),
         TestClient(APP) as c,
     ):
         yield c
@@ -116,7 +116,7 @@ class TestCompare:
 """
 
     def test_returns_200_with_mocked_engine(self, client):
-        with patch("src.api.app.run_comparison", return_value=self._MOCK_RESULT):
+        with patch("src.api.routers.comparison.run_comparison", return_value=self._MOCK_RESULT):
             resp = client.post(
                 "/compare",
                 data={
@@ -132,7 +132,7 @@ class TestCompare:
         assert resp.status_code == 200
 
     def test_response_has_funds_key(self, client):
-        with patch("src.api.app.run_comparison", return_value=self._MOCK_RESULT):
+        with patch("src.api.routers.comparison.run_comparison", return_value=self._MOCK_RESULT):
             resp = client.post(
                 "/compare",
                 data={
@@ -148,7 +148,7 @@ class TestCompare:
         assert "funds" in resp.json()
 
     def test_engine_called_with_correct_weights(self, client):
-        with patch("src.api.app.run_comparison", return_value={"funds": []}) as mock_engine:
+        with patch("src.api.routers.comparison.run_comparison", return_value={"funds": []}) as mock_engine:
             client.post(
                 "/compare",
                 data={
@@ -176,7 +176,7 @@ class TestCompare:
         assert resp.status_code == 422
 
     def test_multiple_files_accepted(self, client):
-        with patch("src.api.app.run_comparison", return_value={"funds": []}) as mock_engine:
+        with patch("src.api.routers.comparison.run_comparison", return_value={"funds": []}) as mock_engine:
             client.post(
                 "/compare",
                 data={
@@ -196,7 +196,7 @@ class TestCompare:
         assert len(kwargs["mislaka_file"]) == 2
 
     def test_bad_hevrot_passed_through(self, client):
-        with patch("src.api.app.run_comparison", return_value={"funds": []}) as mock_engine:
+        with patch("src.api.routers.comparison.run_comparison", return_value={"funds": []}) as mock_engine:
             client.post(
                 "/compare",
                 data={
@@ -214,7 +214,7 @@ class TestCompare:
         assert "הפועלים" in kwargs["bad_hevrot"]
 
     def test_override_risk_level_passed_through(self, client):
-        with patch("src.api.app.run_comparison", return_value={"funds": []}) as mock_engine:
+        with patch("src.api.routers.comparison.run_comparison", return_value={"funds": []}) as mock_engine:
             client.post(
                 "/compare",
                 data={
@@ -239,12 +239,12 @@ class TestCompare:
 
 class TestCommunityLeaderboard:
     def test_returns_200(self, client):
-        with patch("src.api.app.get_leaderboard", AsyncMock(return_value={"profiles": []})):
+        with patch("src.api.routers.community.get_leaderboard", AsyncMock(return_value={"profiles": []})):
             resp = client.get("/community/leaderboard")
         assert resp.status_code == 200
 
     def test_returns_profiles_key(self, client):
-        with patch("src.api.app.get_leaderboard", AsyncMock(return_value={"profiles": []})):
+        with patch("src.api.routers.community.get_leaderboard", AsyncMock(return_value={"profiles": []})):
             resp = client.get("/community/leaderboard")
         assert "profiles" in resp.json()
 
@@ -256,7 +256,7 @@ class TestCommunityLeaderboard:
 
 class TestCommunityProfile:
     def test_returns_404_for_unknown_profile(self, client):
-        with patch("src.api.app.get_profile", AsyncMock(return_value=None)):
+        with patch("src.api.routers.community.get_profile", AsyncMock(return_value=None)):
             resp = client.get("/community/profile/Unknown%2099")
         assert resp.status_code == 404
 
@@ -270,7 +270,7 @@ class TestCommunityProfile:
             "joined": "10/04/2025",
             "funds": [],
         }
-        with patch("src.api.app.get_profile", AsyncMock(return_value=profile)):
+        with patch("src.api.routers.community.get_profile", AsyncMock(return_value=profile)):
             resp = client.get("/community/profile/%D7%A0%D7%A9%D7%A8%2042")
         assert resp.status_code == 200
         assert resp.json()["fake_name"] == "נשר 42"
@@ -311,7 +311,7 @@ class TestCommunityJoin:
                 "joined": "01/01/2026",
             },
         }
-        with patch("src.api.app.join_community", AsyncMock(return_value=mock_result)):
+        with patch("src.api.routers.community.join_community", AsyncMock(return_value=mock_result)):
             resp = client.post("/community/join", json=self._PAYLOAD)
         assert resp.status_code == 200
         assert resp.json()["success"] is True

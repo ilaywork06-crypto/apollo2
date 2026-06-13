@@ -21,7 +21,8 @@
       "Bash(curl -sL https://openclaw.ai/)",
       "Bash(curl -sL https://openclaw.ai/assets/Layout.wUUzETCH.css)",
       "Bash(curl -sL https://openclaw.ai/assets/index@_@astro.CMibRDka.css)",
-      "Bash(grep -E '\\(--[\\\\w-]+:|color:|background:|#[0-9a-fA-F]{3,6}\\)')"
+      "Bash(grep -E '\\(--[\\\\w-]+:|color:|background:|#[0-9a-fA-F]{3,6}\\)')",
+      "Bash(python -m pytest tests/unit/comparison/ -q)"
     ]
   }
 }
