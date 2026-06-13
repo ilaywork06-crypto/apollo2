@@ -19,6 +19,7 @@ from src.comparison.ranking import get_client_ranking
 from src.comparison.risk_classifier import RiskClassifier
 from src.parsers.fund_parser import parse_xml_file
 from src.parsers.mislaka.parser import parse_multible_mislaka_files
+from src.parsers.mislaka.track_extractor import MIN_TRACK_BALANCE
 
 
 def run_comparison(
@@ -96,7 +97,7 @@ def run_comparison(
                 default_client_fund = i
                 break
         money = mislaka["TOTAL-CHISACHON-MTZBR"]
-        if money == 0:
+        if money < MIN_TRACK_BALANCE:
             continue
 
         client = {

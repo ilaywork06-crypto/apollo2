@@ -4,6 +4,10 @@ import lxml.etree as ET
 
 from src.parsers.xml_utils import extract_data_from_xml
 
+# Tracks holding less than this balance (in NIS) are residual/dead accounts
+# (e.g. a one-agora leftover) and are excluded from comparison.
+MIN_TRACK_BALANCE = 1.0
+
 
 def extract_track(
     maslul: ET._Element,
@@ -46,10 +50,10 @@ def extract_track(
         ``TAARICH-HITZTARFUT-MUTZAR``, ``TOTAL-CHISACHON-MTZBR``,
         ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``,
         ``KOD-MEZAHE-YATZRAN``, and ``MISPAR-ZIHUY-LAKOACH`` keys, or ``None``
-        if the track has a zero balance.
+        if the track holds a negligible balance (below :data:`MIN_TRACK_BALANCE`).
     """
     SCHUM_TZVIRA_BAMASLUL = extract_data_from_xml(".//SCHUM-TZVIRA-BAMASLUL", maslul, float)
-    if SCHUM_TZVIRA_BAMASLUL == 0.0:
+    if SCHUM_TZVIRA_BAMASLUL < MIN_TRACK_BALANCE:
         return None
 
     KOD_MASLUL_HASHKAA = extract_data_from_xml(".//KOD-MASLUL-HASHKAA", maslul)

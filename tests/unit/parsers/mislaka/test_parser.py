@@ -52,6 +52,22 @@ class TestParseMislakaFile:
         result = parse_mislaka_file(xml)
         assert result == []
 
+    def test_skips_residual_balance_tracks(self):
+        # A one-agora leftover (0.01) is a dead account and must not be shown,
+        # even though it is not exactly 0.0.
+        xml = MINIMAL_MISLAKA_XML.replace("<SCHUM-TZVIRA-BAMASLUL>200000.0</SCHUM-TZVIRA-BAMASLUL>",
+                                           "<SCHUM-TZVIRA-BAMASLUL>0.01</SCHUM-TZVIRA-BAMASLUL>")
+        result = parse_mislaka_file(xml)
+        assert result == []
+
+    def test_keeps_small_real_balance_tracks(self):
+        # A small but real balance (>= 1 NIS) is still a live account.
+        xml = MINIMAL_MISLAKA_XML.replace("<SCHUM-TZVIRA-BAMASLUL>200000.0</SCHUM-TZVIRA-BAMASLUL>",
+                                           "<SCHUM-TZVIRA-BAMASLUL>38.70</SCHUM-TZVIRA-BAMASLUL>")
+        result = parse_mislaka_file(xml)
+        assert len(result) == 1
+        assert result[0]["TOTAL-CHISACHON-MTZBR"] == pytest.approx(38.70)
+
     def test_strips_xml_declaration(self):
         xml_with_decl = '<?xml version="1.0" encoding="UTF-8"?>' + MINIMAL_MISLAKA_XML
         result = parse_mislaka_file(xml_with_decl)
