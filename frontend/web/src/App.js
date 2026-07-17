@@ -387,19 +387,18 @@ function TreeNode({ node, depth = 0 }) {
 // ─── Upload Zone ───────────────────────────────────────────────────────────────
 
 function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
-  const inputRef = useRef();
+  const fileInputRef = useRef();
+  const folderInputRef = useRef();
 
-  const handleChange = (e) => {
+  const handleChange = (fromFolder) => (e) => {
     const newFiles = Array.from(e.target.files);
     const valid = newFiles.filter(f => /\.(xml|dat)$/i.test(f.name));
-    const invalid = newFiles.filter(f => !/\.(xml|dat)$/i.test(f.name));
-    if (invalid.length > 0) {
-      alert(
-        `הקבצים הבאים אינם נתמכים:\n${invalid.map(f => f.name).join('\n')}\n\nניתן להעלות קבצי XML ו-DAT בלבד.`
-      );
-    }
     if (valid.length > 0) {
       onFiles([...files, ...valid]);
+    } else {
+      alert(fromFolder
+        ? 'לא נמצאו קבצי XML או DAT בתיקייה שנבחרה.'
+        : 'ניתן להעלות קבצי XML ו-DAT בלבד.');
     }
     e.target.value = '';
   };
@@ -408,17 +407,23 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
 
   return (
     <div className="multi-upload-wrap">
-      <div
-        className={`upload-zone${hasFiles ? ' upload-zone--done' : ''}`}
-        onClick={() => inputRef.current.click()}
-      >
+      <div className={`upload-zone${hasFiles ? ' upload-zone--done' : ''}`}>
         <input
-          ref={inputRef}
+          ref={fileInputRef}
           type="file"
           accept=".xml,.dat"
           multiple
           style={{ display: 'none' }}
-          onChange={handleChange}
+          onChange={handleChange(false)}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          accept=".xml,.dat"
+          webkitdirectory=""
+          directory=""
+          style={{ display: 'none' }}
+          onChange={handleChange(true)}
         />
         <div className={`upload-file-icon${hasFiles ? ' done' : ''}`}>
           {hasFiles ? '✓' : '📄'}
@@ -427,7 +432,23 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
         <div className="upload-sub">
           {hasFiles
             ? files.length === 1 ? '1 קובץ נטען' : `${files.length} קבצים נטענו`
-            : 'לחץ לבחירת קבצי XML או DAT (ניתן לבחור מספר קבצים)'}
+            : 'בחר קבצים בודדים או תיקייה שלמה — ייטענו רק קבצי XML ו-DAT'}
+        </div>
+        <div className="upload-pick-actions">
+          <button
+            type="button"
+            className="upload-pick-btn"
+            onClick={() => fileInputRef.current.click()}
+          >
+            📄 בחירת קבצים
+          </button>
+          <button
+            type="button"
+            className="upload-pick-btn"
+            onClick={() => folderInputRef.current.click()}
+          >
+            📁 בחירת תיקייה
+          </button>
         </div>
       </div>
       {hasFiles && (
@@ -673,7 +694,7 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           <div className="hero-badge">השוואת קופות גמל · AmoSight</div>
           <h1 className="hero-title">בדוק את הביצועים<br/>של הקופות שלך</h1>
           <p className="hero-sub">
-            העלה קבצי XML מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופות שלך עומדת מול שוק הגמל
+            העלה קבצים או תיקייה מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופות שלך עומדת מול שוק הגמל
           </p>
         </div>
 
