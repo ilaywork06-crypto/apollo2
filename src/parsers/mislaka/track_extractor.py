@@ -48,7 +48,7 @@ def extract_track(
     Returns:
         A dict with the track's ``GEMELNET_ID``, ``SHEM-TOCHNIT``,
         ``TAARICH-HITZTARFUT-MUTZAR``, ``TOTAL-CHISACHON-MTZBR``,
-        ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``,
+        ``SHEUR-DMEI-NIHUL-HISACHON-MIVNE``, ``SHEUR-DMEI-NIHUL-HAFKADA``,
         ``KOD-MEZAHE-YATZRAN``, and ``MISPAR-ZIHUY-LAKOACH`` keys, or ``None``
         if the track holds a negligible balance (below :data:`MIN_TRACK_BALANCE`).
     """
@@ -64,10 +64,10 @@ def extract_track(
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON-MIVNE", maslul, float),
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON", maslul, float),
     )
-    if FINAL_DMEI_NIHUL_TZVIRA == 0.0:
-        FINAL_DMEI_NIHUL_TZVIRA = extract_data_from_xml(
-            ".//SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH", maslul, float
-        )
+    # if FINAL_DMEI_NIHUL_TZVIRA == 0.0:
+    #     FINAL_DMEI_NIHUL_TZVIRA = extract_data_from_xml(
+    #         ".//SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH", maslul, float
+    #     )
     FINAL_DMEI_NIHUL_HAFKADA = max(
         hafkada_fees.get(KOD_MASLUL_HASHKAA, 0.0),
         uniform_hafkada_fee,
@@ -84,7 +84,7 @@ def extract_track(
         "SHEM-TOCHNIT": shem_tochnit.strip(),
         "TAARICH-HITZTARFUT-MUTZAR": taarich_hitztarfut_mutzar.strip(),
         "TOTAL-CHISACHON-MTZBR": SCHUM_TZVIRA_BAMASLUL,
-        "SHEUR-DMEI-NIHUL-TZVIRA": FINAL_DMEI_NIHUL_TZVIRA,
+        "SHEUR-DMEI-NIHUL-HISACHON-MIVNE": FINAL_DMEI_NIHUL_TZVIRA,
         "SHEUR-DMEI-NIHUL-HAFKADA": FINAL_DMEI_NIHUL_HAFKADA,
         "KOD-MEZAHE-YATZRAN": kod_mezahe_yatzran.strip(),
         "MISPAR-ZIHUY-LAKOACH": mispar_zihuy,

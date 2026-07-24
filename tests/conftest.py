@@ -53,7 +53,7 @@ def make_mislaka(
         "SHEM-TOCHNIT": tochnit_name,
         "TAARICH-HITZTARFUT-MUTZAR": seniority_date,
         "TOTAL-CHISACHON-MTZBR": balance,
-        "SHEUR-DMEI-NIHUL-TZVIRA": dmei_nihul_tzvira,
+        "SHEUR-DMEI-NIHUL-HISACHON-MIVNE": dmei_nihul_tzvira,
         "SHEUR-DMEI-NIHUL-HAFKADA": dmei_nihul_hafkada,
         "KOD-MEZAHE-YATZRAN": yatzran_code,
         "MISPAR-ZIHUY-LAKOACH": client_id,

@@ -75,7 +75,7 @@ def run_comparison(
         our_funds = [f for f in funds_to_suggest if f["SUG"] == sug]
         risk_level = fund["risk_level"]
         comparison_risk_level = override_risk_level if override_risk_level else risk_level
-        dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-TZVIRA"]
+        dmey_nihul = mislaka["SHEUR-DMEI-NIHUL-HISACHON-MIVNE"]
         all_funds_in_risk_level = get_funds_by_risk_level(our_funds, comparison_risk_level)
         if override_risk_level and not any(f["ID"] == fund["ID"] for f in all_funds_in_risk_level):
             client_base = next((f for f in our_funds if f["ID"] == fund["ID"]), fund)
