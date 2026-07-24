@@ -17,7 +17,7 @@ class TestParseMislakaFile:
         record = result[0]
         assert record["GEMELNET_ID"] == "1001"
         assert record["TOTAL-CHISACHON-MTZBR"] == 200000.0
-        assert record["SHEUR-DMEI-NIHUL-HISACHON-MIVNE"] == pytest.approx(0.75)
+        assert record["SHEUR-DMEI-NIHUL-TZVIRA"] == pytest.approx(0.75)
 
     def test_extracts_client_id(self):
         result = parse_mislaka_file(MINIMAL_MISLAKA_XML)
@@ -89,7 +89,7 @@ class TestParseMislakaFile:
         # key, so the fee must be recovered from the policy-wide fallback.
         result = parse_mislaka_file(MISLAKA_UNIFORM_FEE_XML)
         assert len(result) == 1
-        assert result[0]["SHEUR-DMEI-NIHUL-HISACHON-MIVNE"] == pytest.approx(0.7)
+        assert result[0]["SHEUR-DMEI-NIHUL-TZVIRA"] == pytest.approx(0.7)
         assert result[0]["SHEUR-DMEI-NIHUL-HAFKADA"] == pytest.approx(0.0)
 
 

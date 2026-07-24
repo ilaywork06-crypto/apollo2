@@ -41,7 +41,7 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
         A list of dicts, each representing one investment track with the
         following keys: ``GEMELNET_ID``, ``SHEM-TOCHNIT``,
         ``TAARICH-HITZTARFUT-MUTZAR``, ``TOTAL-CHISACHON-MTZBR``,
-        ``SHEUR-DMEI-NIHUL-HISACHON-MIVNE``, ``SHEUR-DMEI-NIHUL-HAFKADA``, and
+        ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``, and
         ``KOD-MEZAHE-YATZRAN``.
     """
     if isinstance(content, str):
