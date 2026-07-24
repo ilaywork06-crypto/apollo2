@@ -64,10 +64,10 @@ def extract_track(
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-TZVIRA", maslul, float),
         extract_data_from_xml(".//SHEUR-DMEI-NIHUL-HISACHON", maslul, float),
     )
-    # if FINAL_DMEI_NIHUL_TZVIRA == 0.0:
-    #     FINAL_DMEI_NIHUL_TZVIRA = extract_data_from_xml(
-    #         ".//SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH", maslul, float
-    #     )
+    if FINAL_DMEI_NIHUL_TZVIRA < 0.125:
+        FINAL_DMEI_NIHUL_TZVIRA = extract_data_from_xml(
+            ".//SHIUR-ALUT-SHNATIT-ZPUIA-LMSLUL-HASHKAH", maslul, float
+        )
     FINAL_DMEI_NIHUL_HAFKADA = max(
         hafkada_fees.get(KOD_MASLUL_HASHKAA, 0.0),
         uniform_hafkada_fee,
