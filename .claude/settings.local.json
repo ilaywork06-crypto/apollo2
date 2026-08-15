@@ -22,7 +22,9 @@
       "Bash(curl -sL https://openclaw.ai/assets/Layout.wUUzETCH.css)",
       "Bash(curl -sL https://openclaw.ai/assets/index@_@astro.CMibRDka.css)",
       "Bash(grep -E '\\(--[\\\\w-]+:|color:|background:|#[0-9a-fA-F]{3,6}\\)')",
-      "Bash(python -m pytest tests/unit/comparison/ -q)"
+      "Bash(python -m pytest tests/unit/comparison/ -q)",
+      "Read(//home/ilayat/.claude/plugins/cache/understand-anything/understand-anything/2.9.4/packages/core/dist/**)",
+      "Bash(pnpm --version)"
     ]
   }
 }
