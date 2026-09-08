@@ -3,7 +3,15 @@ name: Weekly Report to Boss
 on:
   schedule:
     - cron: '0 9 * * 0'
+  # TEMPORARY: מריץ את הדוח בכל push כדי לבדוק אותו. למחוק כשמסיימים לבדוק.
+  push:
+    branches: ["**"]
   workflow_dispatch:
+    inputs:
+      send_to_boss:
+        description: 'לשלוח את המייל גם לבוס? (ריצת בדיקה שולחת רק אליי)'
+        type: boolean
+        default: false
 
 jobs:
   send-weekly-report:
@@ -192,6 +200,12 @@ jobs:
 
           print("סיכום נוצר בהצלחה")
           print("נושא:", subject)
+
+          # כותב את הדוח לסיכום ההרצה ב-Actions, כדי שאפשר לקרוא אותו בלי מייל
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as f:
+                  f.write(f"## {subject}\n\n{body}\n")
           PYEOF
 
       - name: Send email via Gmail
@@ -199,6 +213,7 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           BOSS_EMAIL: ${{ secrets.BOSS_EMAIL }}
+          SEND_TO_BOSS: ${{ github.event_name == 'schedule' || inputs.send_to_boss }}
         run: |
           python3 - <<'PYEOF'
           import smtplib, os
@@ -208,9 +223,18 @@ jobs:
           subject = open("/tmp/email_subject.txt").read().strip()
           body    = open("/tmp/email_body.txt").read().strip()
 
+          # ריצת בדיקה (push / הרצה ידנית) נשלחת רק אליי — הבוס מקבל רק בריצה המתוזמנת
+          send_to_boss = os.environ.get("SEND_TO_BOSS", "").lower() == "true"
+          recipients   = ["ilayatia@gmail.com"]
+          if send_to_boss:
+              recipients.insert(0, os.environ["BOSS_EMAIL"])
+          else:
+              subject = f"[בדיקה] {subject}"
+              print("ריצת בדיקה — המייל נשלח רק אליי, לא לבוס")
+
           msg = MIMEMultipart()
           msg["From"]    = os.environ["GMAIL_USER"]
-          msg["To"]      = os.environ["BOSS_EMAIL"] + ", ilayatia@gmail.com"
+          msg["To"]      = ", ".join(recipients)
           msg["Subject"] = subject
           msg.attach(MIMEText(body, "plain", "utf-8"))
 
@@ -218,5 +242,5 @@ jobs:
               server.login(os.environ["GMAIL_USER"], os.environ["GMAIL_APP_PASSWORD"])
               server.send_message(msg)
 
-          print("המייל נשלח בהצלחה!")
+          print("המייל נשלח בהצלחה אל:", ", ".join(recipients))
           PYEOF
