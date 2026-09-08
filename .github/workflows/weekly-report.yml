@@ -64,6 +64,7 @@ jobs:
       - name: Generate AI summary in Hebrew
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ vars.GROQ_MODEL }}
           YOUR_NAME: ${{ secrets.YOUR_NAME }}
           BOSS_NAME: ${{ secrets.BOSS_NAME }}
           PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
@@ -124,11 +125,53 @@ jobs:
           """
 
           client = Groq(api_key=os.environ["GROQ_API_KEY"])
-          response = client.chat.completions.create(
-              model="llama-3.3-70b-versatile",
-              messages=[{"role": "user", "content": prompt}],
-              max_tokens=4000,
-          )
+
+          # מודלים מועדפים לפי סדר; המפתח לא בהכרח מורשה לכולם
+          PREFERRED = [
+              "llama-3.3-70b-versatile",
+              "openai/gpt-oss-120b",
+              "openai/gpt-oss-20b",
+              "llama-3.1-8b-instant",
+          ]
+          NOT_CHAT = ("whisper", "tts", "guard", "embed", "vision", "ocr")
+
+          def candidate_models():
+              override = os.environ.get("GROQ_MODEL", "").strip()
+              if override:
+                  return [override]
+              try:
+                  available = sorted(m.id for m in client.models.list().data)
+              except Exception as exc:
+                  print(f"אזהרה: לא ניתן לשלוף את רשימת המודלים ({exc})")
+                  return PREFERRED
+              print("מודלים זמינים:", ", ".join(available))
+              allowed = [m for m in PREFERRED if m in available]
+              allowed += [
+                  m for m in available
+                  if m not in allowed and not any(k in m.lower() for k in NOT_CHAT)
+              ]
+              return allowed
+
+          response = None
+          errors = []
+          for model in candidate_models():
+              try:
+                  response = client.chat.completions.create(
+                      model=model,
+                      messages=[{"role": "user", "content": prompt}],
+                      max_tokens=4000,
+                  )
+              except Exception as exc:
+                  print(f"המודל {model} לא זמין: {exc}")
+                  errors.append(f"{model}: {exc}")
+                  continue
+              print("נעשה שימוש במודל:", model)
+              break
+
+          if response is None:
+              raise SystemExit(
+                  "לא נמצא מודל Groq זמין עבור המפתח הזה.\n" + "\n".join(errors)
+              )
 
           text = response.choices[0].message.content.strip()
 

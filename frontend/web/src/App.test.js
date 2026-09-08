@@ -91,7 +91,13 @@ describe('App renders', () => {
 
   test('shows upload section on initial load', () => {
     render(<App />);
-    expect(screen.getByText(/העלה קבצי XML/i)).toBeInTheDocument();
+    expect(screen.getByText(/קבצי מסלקה פנסיונית/i)).toBeInTheDocument();
+  });
+
+  test('offers both file and folder pickers', () => {
+    render(<App />);
+    expect(screen.getByText(/בחירת קבצים/i)).toBeInTheDocument();
+    expect(screen.getByText(/בחירת תיקייה/i)).toBeInTheDocument();
   });
 
   test('shows weight labels for all four metrics', () => {
