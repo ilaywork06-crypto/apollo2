@@ -13,7 +13,7 @@ on:
         type: boolean
         default: false
 
-        
+
 jobs:
   send-weekly-report:
     runs-on: ubuntu-latest
@@ -24,6 +24,7 @@ jobs:
         with:
           fetch-depth: 0
 
+          
       - name: Collect git changes
         run: |
           SINCE=$(date -d '7 days ago' '+%Y-%m-%d')
@@ -233,15 +234,34 @@ jobs:
               subject = f"[בדיקה] {subject}"
               print("ריצת בדיקה — המייל נשלח רק אליי, לא לבוס")
 
+          user = os.environ.get("GMAIL_USER", "").strip()
+          # גוגל מציגה סיסמת אפליקציה עם רווחים ("abcd efgh ijkl mnop") — צריך להסיר אותם
+          password = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "").replace("\u00a0", "").strip()
+
+          missing = [n for n, v in (("GMAIL_USER", user), ("GMAIL_APP_PASSWORD", password)) if not v]
+          if missing:
+              raise SystemExit("חסרים secrets: " + ", ".join(missing))
+          print(f"מתחבר כ-{user} (אורך סיסמת האפליקציה: {len(password)})")
+
           msg = MIMEMultipart()
-          msg["From"]    = os.environ["GMAIL_USER"]
+          msg["From"]    = user
           msg["To"]      = ", ".join(recipients)
           msg["Subject"] = subject
           msg.attach(MIMEText(body, "plain", "utf-8"))
 
-          with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-              server.login(os.environ["GMAIL_USER"], os.environ["GMAIL_APP_PASSWORD"])
-              server.send_message(msg)
+          try:
+              with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                  server.login(user, password)
+                  server.send_message(msg)
+          except smtplib.SMTPAuthenticationError as exc:
+              raise SystemExit(
+                  f"גוגל דחתה את פרטי ההתחברות ({exc.smtp_code}). מה לבדוק:\n"
+                  f"- GMAIL_APP_PASSWORD חייב להיות App Password בן 16 תווים, לא סיסמת החשבון "
+                  f"(האורך שנשלח: {len(password)})\n"
+                  f"- GMAIL_USER ({user}) חייב להיות אותו חשבון שיצר את סיסמת האפליקציה\n"
+                  "- אימות דו-שלבי חייב להיות פעיל; כיבוי שלו מוחק את כל סיסמאות האפליקציה\n"
+                  "- ליצירת סיסמה חדשה: https://myaccount.google.com/apppasswords"
+              ) from None
 
           print("המייל נשלח בהצלחה אל:", ", ".join(recipients))
           PYEOF
