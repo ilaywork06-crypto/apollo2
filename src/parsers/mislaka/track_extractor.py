@@ -21,6 +21,7 @@ def extract_track(
     taarich_hitztarfut_mutzar: str,
     kod_mezahe_yatzran: str,
     mispar_zihuy: str,
+    shem_lakoach: str = "",
 ) -> dict | None:
     """Build one investment-track record, or ``None`` if it holds no balance.
 
@@ -44,13 +45,15 @@ def extract_track(
         taarich_hitztarfut_mutzar: The product join date for this policy.
         kod_mezahe_yatzran: The producer identifier for this Mutzar.
         mispar_zihuy: The client identifier for this holding.
+        shem_lakoach: The client's full name, or ``""`` if the file has none.
 
     Returns:
         A dict with the track's ``GEMELNET_ID``, ``SHEM-TOCHNIT``,
         ``TAARICH-HITZTARFUT-MUTZAR``, ``TOTAL-CHISACHON-MTZBR``,
         ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``,
-        ``KOD-MEZAHE-YATZRAN``, and ``MISPAR-ZIHUY-LAKOACH`` keys, or ``None``
-        if the track holds a negligible balance (below :data:`MIN_TRACK_BALANCE`).
+        ``KOD-MEZAHE-YATZRAN``, ``MISPAR-ZIHUY-LAKOACH``, and ``SHEM-LAKOACH``
+        keys, or ``None`` if the track holds a negligible balance (below
+        :data:`MIN_TRACK_BALANCE`).
     """
     SCHUM_TZVIRA_BAMASLUL = extract_data_from_xml(".//SCHUM-TZVIRA-BAMASLUL", maslul, float)
     if SCHUM_TZVIRA_BAMASLUL < MIN_TRACK_BALANCE:
@@ -88,4 +91,5 @@ def extract_track(
         "SHEUR-DMEI-NIHUL-HAFKADA": FINAL_DMEI_NIHUL_HAFKADA,
         "KOD-MEZAHE-YATZRAN": kod_mezahe_yatzran.strip(),
         "MISPAR-ZIHUY-LAKOACH": mispar_zihuy,
+        "SHEM-LAKOACH": shem_lakoach,
     }

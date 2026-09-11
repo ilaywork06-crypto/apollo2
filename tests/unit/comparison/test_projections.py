@@ -195,3 +195,15 @@ class TestCalculatePotentialAmountExact:
         assert r5 == self._expected(amount, 6.0, 11.0, 5)
         # Ordering must hold
         assert r1 < r3 < r5
+
+
+class TestBetterField:
+    def test_reads_better_fund_from_better_field(self):
+        current = make_fund("c", tsua_1=10.0)
+        better = make_fund("b", tsua_1=10.0)
+        better["tsua_mitztaberet_letkufa_gross"] = 21.0
+        result = calculate_potential_amount(
+            110_000.0, current, better, "tsua_mitztaberet_letkufa", 1,
+            better_field="tsua_mitztaberet_letkufa_gross",
+        )
+        assert result == pytest.approx(121_000.0)

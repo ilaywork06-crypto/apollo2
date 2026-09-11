@@ -1,6 +1,7 @@
 """Unit tests for src/comparison/grading.py"""
 
-from src.comparison.grading import add_grade_and_sort, calculate_grade, get_top_3
+from src.comparison.grading import add_grade_and_sort, calculate_grade, get_top_3, has_grade
+from src.comparison.pool import build_graded_pool
 from tests.conftest import make_fund, make_normalized_fund
 
 
@@ -24,10 +25,22 @@ class TestCalculateGrade:
         # weights sum = 10+20+25+40 = 95 != 100
         assert calculate_grade(fund, 10, 20, 25, 40) == 0
 
-    def test_returns_zero_when_only_one_field_nonzero(self):
-        fund = make_normalized_fund(tsua_1_norm=50.0, tsua_3_norm=0.0, tsua_5_norm=0.0, sharpe_norm=0.0)
-        # Only weight_1=10 is active -> total_weight=10 != 100
+    def test_returns_zero_when_only_one_field_has_data(self):
+        # Raw 0.0 is the parser's "missing" marker: only the 1Y return has data
+        fund = make_normalized_fund(
+            tsua_1_norm=50.0, tsua_3_norm=0.0, tsua_5_norm=0.0, sharpe_norm=0.0,
+            tsua_3=0.0, tsua_5=0.0, sharpe=0.0,
+        )
         assert calculate_grade(fund, 10, 20, 25, 45) == 0
+
+    def test_pool_minimum_with_full_data_still_gets_a_grade(self):
+        # Scoring the pool's minimum on a metric (normalised 0) is not missing data
+        fund = make_normalized_fund(tsua_1_norm=0.0, tsua_3_norm=50.0, tsua_5_norm=50.0, sharpe_norm=50.0)
+        assert calculate_grade(fund, 10, 20, 25, 45) == 45.0
+
+    def test_missing_metric_with_zero_weight_is_ignored(self):
+        fund = make_normalized_fund(tsua_1_norm=100.0, tsua_3_norm=100.0, tsua_5_norm=100.0, sharpe_norm=100.0, tsua_5=0.0)
+        assert calculate_grade(fund, 20, 30, 0, 50) == 100.0
 
     def test_grade_rounded_to_two_decimals(self):
         fund = self._full_fund(v1=33.33, v3=33.33, v5=33.34, vs=33.33)
@@ -43,8 +56,68 @@ class TestCalculateGrade:
         # Sharpe has weight 45; push it to 100, everything else to 0
         fund_high_sharpe = make_normalized_fund(tsua_1_norm=80.0, tsua_3_norm=80.0, tsua_5_norm=80.0, sharpe_norm=100.0)
         fund_low_sharpe = make_normalized_fund(tsua_1_norm=80.0, tsua_3_norm=80.0, tsua_5_norm=80.0, sharpe_norm=0.0)
-        # fund_low_sharpe's sharpe is 0 -> weight_sharp not counted -> total_weight = 55 != 100 -> grade = 0
+        # fund_low_sharpe has the pool's lowest Sharpe -> that 45% contributes nothing
         assert calculate_grade(fund_high_sharpe, 10, 20, 25, 45) > calculate_grade(fund_low_sharpe, 10, 20, 25, 45)
+
+
+class TestLiquidityWeight:
+    def test_liquidity_is_the_fifth_weighted_metric(self):
+        fund = make_normalized_fund(
+            tsua_1_norm=100.0, tsua_3_norm=100.0, tsua_5_norm=100.0, sharpe_norm=100.0,
+            liquidity_norm=50.0, liquidity_index=5.0,
+        )
+        # 90% of the weight scores 100, the 10% liquidity weight scores 50
+        assert calculate_grade(fund, 10, 20, 25, 35, 10) == 95.0
+
+    def test_lowest_liquidity_contributes_zero_but_keeps_the_grade(self):
+        fund = make_normalized_fund(
+            tsua_1_norm=100.0, tsua_3_norm=100.0, tsua_5_norm=100.0, sharpe_norm=100.0,
+            liquidity_norm=0.0, liquidity_index=-40.0,
+        )
+        assert calculate_grade(fund, 10, 20, 25, 35, 10) == 90.0
+
+    def test_missing_liquidity_data_gives_zero_when_weighted(self):
+        fund = make_normalized_fund(liquidity_index=None)
+        assert calculate_grade(fund, 10, 20, 25, 35, 10) == 0
+
+    def test_missing_liquidity_data_ignored_when_unweighted(self):
+        fund = make_normalized_fund(liquidity_index=None)
+        assert calculate_grade(fund, 10, 20, 25, 45, 0) > 0
+
+    def test_five_weights_must_sum_to_100(self):
+        fund = make_normalized_fund(liquidity_index=5.0, liquidity_norm=50.0)
+        assert calculate_grade(fund, 10, 20, 25, 45, 10) == 0
+
+    def test_add_grade_and_sort_passes_liquidity_weight(self):
+        low = make_normalized_fund("low", liquidity_index=-5.0, liquidity_norm=0.0)
+        high = make_normalized_fund("high", liquidity_index=30.0, liquidity_norm=100.0)
+        result = add_grade_and_sort([low, high], 10, 20, 25, 35, 10)
+        assert [f["ID"] for f in result] == ["high", "low"]
+
+
+class TestHasGrade:
+    def test_scored_fund(self):
+        assert has_grade(make_normalized_fund(liquidity_index=1.0), 10, 20, 25, 35, 10) is True
+
+    def test_weights_not_summing_to_100(self):
+        assert has_grade(make_normalized_fund(liquidity_index=1.0), 10, 20, 25, 40, 10) is False
+
+    def test_missing_weighted_metric(self):
+        assert has_grade(make_normalized_fund(tsua_3=0.0), 10, 20, 25, 45, 0) is False
+
+
+class TestFourWeightCallers:
+    """Callers written before the liquidity weight existed pass four weights; it must default to 0."""
+
+    def test_has_grade(self):
+        assert has_grade(make_normalized_fund(), 10, 20, 25, 45) is True
+
+    def test_calculate_grade(self):
+        assert calculate_grade(make_normalized_fund(), 10, 20, 25, 45) > 0
+
+    def test_build_graded_pool(self):
+        funds = [make_fund("1", tsua_1=10.0), make_fund("2", tsua_1=20.0)]
+        assert build_graded_pool(funds, 0.5, 10, 20, 25, 45)[0]["grade"] > 0
 
 
 class TestAddGradeAndSort:

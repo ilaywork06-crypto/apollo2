@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.comparison.risk_classifier import RiskClassifier
+from src.comparison.risk_classifier import RiskClassifier, split_equity_exposure
 
 
 @pytest.fixture
@@ -98,3 +98,45 @@ class TestGetEquityExposure:
 
     def test_zero_exposure_fund(self, classifier):
         assert classifier.get_equity_exposure(1006) == 0.0
+
+
+class TestForeignExposure:
+    def test_foreign_map_used_with_risks(self):
+        rc = RiskClassifier(risks={1: 60.0}, foreign={1: 20.0})
+        assert rc.get_foreign_exposure(1) == 20.0
+
+    def test_unknown_foreign_exposure_is_none(self):
+        rc = RiskClassifier(risks={1: 60.0})
+        assert rc.get_foreign_exposure(1) is None
+
+    def test_path_loads_foreign_exposure(self, tmp_path):
+        xml_path = tmp_path / "risks.xml"
+        xml_path.write_text("""\
+<ROWSET>
+  <Row><SHM_SUG_NECHES>, חשיפה למניות</SHM_SUG_NECHES><ID_KUPA>7</ID_KUPA><ACHUZ_SUG_NECHES>80.0</ACHUZ_SUG_NECHES></Row>
+  <Row><SHM_SUG_NECHES>חשיפה לחו"ל</SHM_SUG_NECHES><ID_KUPA>7</ID_KUPA><ACHUZ_SUG_NECHES>30.0</ACHUZ_SUG_NECHES></Row>
+</ROWSET>""", encoding="utf-8")
+        rc = RiskClassifier(path=xml_path)
+        assert rc.get_foreign_exposure(7) == 30.0
+
+
+class TestSplitEquityExposure:
+    def test_all_israeli_equity(self):
+        # The fund-15311 example: ~100% equity, no foreign exposure -> all Israeli
+        assert split_equity_exposure(99.87, 0.0) == (99.87, 100.0)
+
+    def test_israeli_equity_is_equity_minus_foreign(self):
+        israel, share = split_equity_exposure(80.0, 30.0)
+        assert israel == 50.0
+        assert share == 62.5
+
+    def test_foreign_above_equity_floors_at_zero(self):
+        # Foreign exposure also covers foreign bonds, so it can exceed equity
+        assert split_equity_exposure(5.8, 21.09) == (0.0, 0.0)
+
+    def test_no_equity_has_no_share(self):
+        assert split_equity_exposure(0.0, 10.0) == (0.0, None)
+
+    def test_missing_data(self):
+        assert split_equity_exposure(None, 10.0) == (None, None)
+        assert split_equity_exposure(50.0, None) == (None, None)

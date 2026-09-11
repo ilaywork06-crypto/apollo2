@@ -1,332 +1,356 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// Upload screen: settings, files, the request that is sent, and error recovery.
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import App from './App';
+import {
+  MOCK_RESULT, analyzeButton, drag, goToResults, mockFetchJson, stubWidth, uploadFiles, waitForRequest, xmlFile,
+} from './testing/fixtures';
 
-// ─── Mocks ────────────────────────────────────────────────────────────────────
-
-global.fetch = jest.fn();
-global.URL.createObjectURL = jest.fn(() => 'blob:mock');
-global.URL.revokeObjectURL = jest.fn();
-
-jest.mock('html2canvas', () =>
-  jest.fn(() => Promise.resolve({ toDataURL: () => 'data:image/png;base64,mock' }))
-);
-jest.mock('jspdf', () =>
-  jest.fn().mockImplementation(() => ({
-    addImage: jest.fn(),
-    save: jest.fn(),
-    internal: { pageSize: { getWidth: () => 210, getHeight: () => 297 } },
-  }))
-);
-
-beforeEach(() => {
-  fetch.mockReset();
-});
-
-// Loading animation takes ~4 seconds; give tests enough headroom
 jest.setTimeout(20000);
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const legend = () => document.querySelector('.weights-form .risk-band-legend').textContent;
+const weightMarkers = () => document.querySelectorAll('.weights-form .risk-band-marker--draggable');
+const openStep = (label) => fireEvent.click(screen.getByText(label));
 
-const MOCK_RESULT = {
-  funds: [
-    {
-      client: {
-        name: 'מיטב גמל',
-        id: '103',
-        client_id: '987654321',
-        grade: 72.5,
-        default_grade: 70.0,
-        rank: 3,
-        total_in_risk: 20,
-        risk_level: 'medium',
-        amount: 150000,
-        dmei_nihul: 0.5,
-        tsua_1: 18.98,
-        tsua_3: 10.0,
-        tsua_5: 9.0,
-        hevra: 'מיטב גמל ופנסיה בע"מ',
-        seniority_date: '01/01/2018',
-        percentile: 85,
-        equity_exposure: 46.44,
-      },
-      alternatives: [
-        {
-          name: 'הראל גמל',
-          id: '200',
-          grade: 85.0,
-          rank: 1,
-          hevra: 'הראל פנסיה וגמל בע"מ',
-          tsua_1: 22.0,
-          tsua_3: 14.0,
-          tsua_5: 12.0,
-          potential_amount: 160000,
-          diff: 10000,
-          diff_percent: 6.7,
-          potential_amount_3: 180000,
-          diff_3: 30000,
-          diff_percent_3: 20.0,
-          potential_amount_5: 210000,
-          diff_5: 60000,
-          diff_percent_5: 40.0,
-        },
-      ],
-      golden: {},
-    },
-  ],
-};
-
-function uploadFile(filename = 'test.xml') {
-  const input = document.querySelector('input[type="file"]');
-  const file = new File(['<MislakaRoot/>'], filename, { type: 'text/xml' });
-  fireEvent.change(input, { target: { files: [file] } });
-  return file;
+async function submit() {
+  mockFetchJson(MOCK_RESULT);
+  uploadFiles([xmlFile()]);
+  fireEvent.click(analyzeButton());
+  return waitForRequest();
 }
 
-// ─── Rendering ────────────────────────────────────────────────────────────────
+// ─── Initial state ───────────────────────────────────────────────────────────
 
-describe('App renders', () => {
-  test('renders without crashing', () => {
+describe('Initial upload screen', () => {
+  test('offers file and folder pickers', () => {
     render(<App />);
+    expect(screen.getByRole('button', { name: /בחירת קבצים/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /בחירת תיקייה/ })).toBeInTheDocument();
+    expect(document.querySelector('input[webkitdirectory]')).toBeTruthy();
   });
 
-  test('shows upload section on initial load', () => {
+  test('analyze is disabled until a file is chosen', () => {
     render(<App />);
-    expect(screen.getByText(/קבצי מסלקה פנסיונית/i)).toBeInTheDocument();
+    expect(analyzeButton()).toBeDisabled();
+    expect(screen.getByText(/העלה לפחות קובץ אחד/)).toBeInTheDocument();
   });
 
-  test('offers both file and folder pickers', () => {
+  test('five weights with the new defaults (Sharpe 35%, liquidity 10%)', () => {
     render(<App />);
-    expect(screen.getByText(/בחירת קבצים/i)).toBeInTheDocument();
-    expect(screen.getByText(/בחירת תיקייה/i)).toBeInTheDocument();
+    expect(document.querySelectorAll('.weights-form .risk-band-seg')).toHaveLength(5);
+    expect(weightMarkers()).toHaveLength(4);
+    expect(legend()).toMatch(/תשואה שנה — 10%/);
+    expect(legend()).toMatch(/תשואה 3 שנים — 20%/);
+    expect(legend()).toMatch(/תשואה 5 שנים — 25%/);
+    expect(legend()).toMatch(/Sharp Ratio — 35%/);
+    expect(legend()).toMatch(/מדד נזילות — 10%/);
+    expect(screen.queryByRole('button', { name: /איפוס/ })).not.toBeInTheDocument();
   });
 
-  test('shows weight labels for all four metrics', () => {
+  test('risk bands default to 25% / 75%', () => {
     render(<App />);
-    expect(screen.getByText(/תשואה שנה/i)).toBeInTheDocument();
-    expect(screen.getByText(/תשואה 3 שנים/i)).toBeInTheDocument();
-    expect(screen.getByText(/תשואה 5 שנים/i)).toBeInTheDocument();
-    expect(screen.getByText(/Sharp Ratio/i)).toBeInTheDocument();
+    const editor = document.querySelector('.risk-band-editor');
+    expect(editor.textContent).toMatch(/נמוך — 0%–25% חשיפה/);
+    expect(editor.textContent).toMatch(/בינוני — 25%–75% חשיפה/);
   });
 
-  test('shows company blacklist checkboxes', () => {
+  test('collapsible steps start closed', () => {
     render(<App />);
-    // The hevrot panel is collapsed by default — open it first
-    fireEvent.click(screen.getByText('בחירת חברות מנהלות'));
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes.length).toBeGreaterThan(0);
-  });
-
-  test('submit button is present', () => {
-    render(<App />);
-    const btn = screen.getByRole('button', { name: /הפעל ניתוח/i });
-    expect(btn).toBeInTheDocument();
-  });
-
-  test('submit button is disabled when no file is selected', () => {
-    render(<App />);
-    const btn = screen.getByRole('button', { name: /הפעל ניתוח/i });
-    expect(btn).toBeDisabled();
-  });
-
-  test('weight bar segments are present (4 metrics)', () => {
-    render(<App />);
-    const segments = document.querySelectorAll('.weights-form .risk-band-seg');
-    expect(segments.length).toBe(4);
-  });
-
-  test('shows exposure threshold controls', () => {
-    render(<App />);
-    // The risk exposure section renders labels like "0–25% חשיפה למניות" or just "חשיפה"
-    expect(document.body.textContent).toMatch(/חשיפה/);
+    expect(document.querySelector('.geo-editor')).toBeNull();
+    expect(document.querySelector('.hevrot-checklist')).toBeNull();
+    expect(document.querySelector('.aggregate-toggle-row')).toBeNull();
   });
 });
 
-// ─── Weight controls ──────────────────────────────────────────────────────────
+// ─── The request ─────────────────────────────────────────────────────────────
 
-describe('Weight controls', () => {
-  test('default weights are displayed (10, 20, 25, 45)', () => {
+describe('Request sent on analyze', () => {
+  test('carries every setting with its default', async () => {
     render(<App />);
-    // The four default values should all appear in the document
-    expect(document.body.textContent).toMatch(/10/);
-    expect(document.body.textContent).toMatch(/20/);
-    expect(document.body.textContent).toMatch(/25/);
-    expect(document.body.textContent).toMatch(/45/);
-  });
-
-  test('weight bar legend shows current weight percentages', () => {
-    render(<App />);
-    // Legend renders each weight value as "label — X%"
-    expect(document.body.textContent).toMatch(/10%/);
-    expect(document.body.textContent).toMatch(/20%/);
-    expect(document.body.textContent).toMatch(/25%/);
-    expect(document.body.textContent).toMatch(/45%/);
-  });
-
-  test('weight bar markers are rendered (3 dividers between 4 segments)', () => {
-    render(<App />);
-    const markers = document.querySelectorAll('.weights-form .risk-band-marker--draggable');
-    expect(markers.length).toBe(3);
-  });
-});
-
-// ─── File upload ─────────────────────────────────────────────────────────────
-
-describe('File upload', () => {
-  test('uploading a file enables the submit button', async () => {
-    render(<App />);
-    uploadFile();
-    await waitFor(() => {
-      const btn = screen.getByRole('button', { name: /הפעל ניתוח/i });
-      expect(btn).not.toBeDisabled();
+    const { url, body } = await submit();
+    expect(url).toBe('http://localhost:8000/compare');
+    expect(Object.fromEntries(['weight_1', 'weight_3', 'weight_5', 'weight_sharp', 'weight_liquidity',
+      'low_exposure_threshold', 'medium_exposure_threshold', 'israel_share_min', 'israel_share_max']
+      .map(k => [k, body.get(k)]))).toEqual({
+      weight_1: '10', weight_3: '20', weight_5: '25', weight_sharp: '35', weight_liquidity: '10',
+      low_exposure_threshold: '25', medium_exposure_threshold: '75', israel_share_min: '0', israel_share_max: '100',
     });
+    expect(body.getAll('mislaka_file').map(f => f.name)).toEqual(['test.xml']);
+    expect(body.getAll('bad_hevrot')).toHaveLength(6);
+    expect(body.has('override_risk_level')).toBe(false);
   });
 
-  test('shows file name after upload', async () => {
+  test('an unchecked company is excluded and a checked one is not', async () => {
     render(<App />);
-    uploadFile('mislaka.xml');
-    await waitFor(() => {
-      expect(screen.getByText(/mislaka\.xml/i)).toBeInTheDocument();
-    });
+    openStep('בחירת חברות מנהלות');
+    const checklist = document.querySelector('.hevrot-checklist');
+    fireEvent.click(within(checklist).getByLabelText('מיטב גמל ופנסיה בע"מ'));
+    fireEvent.click(within(checklist).getByLabelText('סלייס גמל בע"מ'));
+    const { body } = await submit();
+    expect(body.getAll('bad_hevrot')).toContain('מיטב גמל ופנסיה בע"מ');
+    expect(body.getAll('bad_hevrot')).not.toContain('סלייס גמל בע"מ');
   });
 
-  test('submit button remains disabled without file', () => {
+  test('"select all" clears the exclusion list', async () => {
     render(<App />);
-    const btn = screen.getByRole('button', { name: /הפעל ניתוח/i });
-    expect(btn).toBeDisabled();
-  });
-});
-
-// ─── Compare flow ─────────────────────────────────────────────────────────────
-
-describe('Compare flow', () => {
-  test('fetch is called with POST method when form submitted', async () => {
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => MOCK_RESULT,
-    });
-    render(<App />);
-    uploadFile();
-    const btn = await screen.findByRole('button', { name: /הפעל ניתוח/i });
-    fireEvent.click(btn);
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/compare'),
-        expect.objectContaining({ method: 'POST' }),
-      );
-    }, { timeout: 5000 });
-  });
-
-  test('loading screen appears immediately after clicking analyze', async () => {
-    fetch.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, json: async () => MOCK_RESULT }), 2000))
-    );
-    render(<App />);
-    uploadFile();
-    const btn = await screen.findByRole('button', { name: /הפעל ניתוח/i });
-    fireEvent.click(btn);
-    // Immediately after click, the loading screen should be visible
-    await waitFor(() => {
-      expect(document.querySelector('.screen--upload')).not.toBeInTheDocument();
-    }, { timeout: 3000 });
-  });
-
-  test('fetch payload contains weight fields', async () => {
-    let capturedBody;
-    fetch.mockImplementation((url, options) => {
-      capturedBody = options.body;
-      return Promise.resolve({ ok: true, json: async () => MOCK_RESULT });
-    });
-    render(<App />);
-    uploadFile();
-    const btn = await screen.findByRole('button', { name: /הפעל ניתוח/i });
-    fireEvent.click(btn);
-    await waitFor(() => {
-      expect(capturedBody).toBeTruthy();
-    });
-    // FormData doesn't expose entries directly in jest, but body should be truthy
-    expect(capturedBody).toBeInstanceOf(FormData);
-  });
-
-  test('shows loading indicator after clicking analyze', async () => {
-    fetch.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, json: async () => MOCK_RESULT }), 500))
-    );
-    render(<App />);
-    uploadFile();
-    const btn = await screen.findByRole('button', { name: /הפעל ניתוח/i });
-    fireEvent.click(btn);
-    // Loading step text should appear
-    await waitFor(() => {
-      const bodyText = document.body.textContent;
-      const hasLoadingText =
-        bodyText.includes('XML') || bodyText.includes('מחשב') || bodyText.includes('משווה') || bodyText.includes('מכין');
-      expect(hasLoadingText).toBe(true);
-    }, { timeout: 3000 });
+    openStep('בחירת חברות מנהלות');
+    fireEvent.click(screen.getByLabelText('בחר / בטל הכל'));
+    const { body } = await submit();
+    expect(body.getAll('bad_hevrot')).toEqual([]);
   });
 });
 
-// ─── Error handling ───────────────────────────────────────────────────────────
+// ─── Weights ─────────────────────────────────────────────────────────────────
 
-describe('Error handling', () => {
-  test('shows some error indication on network failure', async () => {
-    fetch.mockRejectedValueOnce(new Error('Network error'));
+describe('Dragging the AmoScore weights', () => {
+  const renderWeights = () => {
     render(<App />);
-    uploadFile();
-    const btn = await screen.findByRole('button', { name: /הפעל ניתוח/i });
-    fireEvent.click(btn);
-    await waitFor(() => {
-      // After error, the upload screen should be back (can retry)
-      expect(document.body.textContent).toBeTruthy();
-    }, { timeout: 8000 });
+    stubWidth(document.querySelector('.weights-form .risk-band-bar-wrap'));
+  };
+
+  test('moving the Sharpe/liquidity divider trades weight between just those two', async () => {
+    renderWeights();
+    drag(weightMarkers()[3], 800); // 90% -> 80%
+    expect(legend()).toMatch(/Sharp Ratio — 25%/);
+    expect(legend()).toMatch(/מדד נזילות — 20%/);
+    expect(legend()).toMatch(/תשואה 5 שנים — 25%/);
+    const { body } = await submit();
+    expect([body.get('weight_sharp'), body.get('weight_liquidity')]).toEqual(['25', '20']);
   });
 
-  test('does not permanently lock the UI after error', async () => {
-    fetch.mockRejectedValueOnce(new Error('fail'));
-    render(<App />);
-    uploadFile();
-    const btn = await screen.findByRole('button', { name: /הפעל ניתוח/i });
-    fireEvent.click(btn);
-    await waitFor(() => {
-      // Eventually the UI recovers (button becomes available again or upload shown)
-      expect(document.querySelector('.screen')).toBeTruthy();
-    }, { timeout: 8000 });
-  });
-});
-
-// ─── Company blacklist ────────────────────────────────────────────────────────
-
-describe('Company blacklist', () => {
-  test('can toggle a company checkbox on and off', async () => {
-    render(<App />);
-    fireEvent.click(screen.getByText('בחירת חברות מנהלות'));
-    const checkboxes = screen.getAllByRole('checkbox');
-    const first = checkboxes[0];
-    const initialState = first.checked;
-    fireEvent.click(first);
-    await waitFor(() => expect(first.checked).toBe(!initialState));
-    fireEvent.click(first);
-    await waitFor(() => expect(first.checked).toBe(initialState));
+  test('a divider cannot pass its neighbours', () => {
+    renderWeights();
+    drag(weightMarkers()[3], 100); // would cross the 5Y divider at 55%
+    expect(legend()).toMatch(/Sharp Ratio — 0%/);
+    expect(legend()).toMatch(/מדד נזילות — 45%/);
+    drag(weightMarkers()[0], 1200); // beyond the bar: stops at the next divider (30%)
+    expect(legend()).toMatch(/תשואה שנה — 30%/);
+    expect(legend()).toMatch(/תשואה 3 שנים — 0%/);
   });
 
-  test('at least one company is pre-selected by default', () => {
-    render(<App />);
-    fireEvent.click(screen.getByText('בחירת חברות מנהלות'));
-    const checkboxes = screen.getAllByRole('checkbox');
-    const checked = Array.from(checkboxes).filter((cb) => cb.checked);
-    expect(checked.length).toBeGreaterThan(0);
+  test('weights always total 100% and can be reset', () => {
+    renderWeights();
+    drag(weightMarkers()[1], 400);
+    drag(weightMarkers()[2], 700);
+    const values = legend().match(/— (\d+)%/g).map(s => Number(s.match(/\d+/)[0]));
+    expect(values.reduce((a, b) => a + b, 0)).toBe(100);
+    fireEvent.click(screen.getByRole('button', { name: /איפוס/ }));
+    expect(legend()).toMatch(/Sharp Ratio — 35%/);
   });
 });
 
-// ─── Constants in UI ─────────────────────────────────────────────────────────
+// ─── Risk bands ──────────────────────────────────────────────────────────────
 
-describe('UI constants', () => {
-  test('hero heading is present', () => {
+describe('Risk bands', () => {
+  test('dragging the thresholds changes the request', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    stubWidth(document.querySelector('.risk-band-editor .risk-band-bar-wrap'));
+    const [low, medium] = document.querySelectorAll('.risk-band-editor .risk-band-marker--draggable');
+    drag(low, 400);      // 40% of 130 -> 52
+    drag(medium, 700);   // 70% of 130 -> 91
+    expect(document.querySelector('.risk-band-editor').textContent).toMatch(/נמוך — 0%–52% חשיפה/);
+    const { body } = await submit();
+    expect([body.get('low_exposure_threshold'), body.get('medium_exposure_threshold')]).toEqual(['52', '91']);
   });
 
-  test('page has a header element', () => {
+  test('clicking a band compares against it; clicking again cancels', async () => {
     render(<App />);
-    expect(document.querySelector('header')).toBeTruthy();
+    const high = document.querySelector('.risk-band-seg--high');
+    fireEvent.click(high);
+    expect(screen.getByText(/השוואה לקבוצת סיכון גבוה/)).toBeInTheDocument();
+    fireEvent.click(high);
+    fireEvent.click(document.querySelector('.risk-band-seg--low'));
+    const { body } = await submit();
+    expect(body.get('override_risk_level')).toBe('low');
+  });
+});
+
+// ─── Israel / abroad ─────────────────────────────────────────────────────────
+
+describe('Israel / abroad equity filter', () => {
+  const renderGeo = () => {
+    render(<App />);
+    openStep('מניות ישראל / חו״ל');
+  };
+  const summary = () => document.querySelector('.geo-summary').textContent;
+  const geoMarkers = () => document.querySelectorAll('.geo-editor .risk-band-marker--draggable');
+
+  test('no preference by default', () => {
+    renderGeo();
+    expect(summary()).toMatch(/ללא העדפה/);
+    expect(screen.getByRole('button', { name: 'ללא העדפה' })).toHaveClass('active');
+  });
+
+  test.each([
+    ['מוטה ישראל', '60', '100', /ישראל 60%–100% ממרכיב המניות · חו״ל 0%–40%/],
+    ['מאוזן', '30', '70', /ישראל 30%–70%/],
+    ['מוטה חו״ל', '0', '40', /ישראל 0%–40% ממרכיב המניות · חו״ל 60%–100%/],
+  ])('preset "%s" sends %s–%s', async (preset, min, max, text) => {
+    renderGeo();
+    fireEvent.click(screen.getByRole('button', { name: preset }));
+    expect(summary()).toMatch(text);
+    const { body } = await submit();
+    expect([body.get('israel_share_min'), body.get('israel_share_max')]).toEqual([min, max]);
+  });
+
+  test('handles keep at least 5 points apart', async () => {
+    renderGeo();
+    stubWidth(document.querySelector('.geo-editor .risk-band-bar-wrap'));
+    const [min, max] = geoMarkers();
+    drag(min, 700);
+    drag(max, 710);
+    expect(summary()).toMatch(/ישראל 70%–75%/);
+    drag(min, 900);
+    expect(summary()).toMatch(/ישראל 70%–75%/);
+    const { body } = await submit();
+    expect([body.get('israel_share_min'), body.get('israel_share_max')]).toEqual(['70', '75']);
+  });
+
+  test('closed step shows the active range and can be reset', () => {
+    renderGeo();
+    fireEvent.click(screen.getByRole('button', { name: 'מוטה חו״ל' }));
+    openStep('מניות ישראל / חו״ל');
+    expect(document.querySelector('.step-card-chip').textContent).toMatch(/ישראל 0%–40%/);
+    fireEvent.click(screen.getAllByRole('button', { name: /איפוס/ })[0]);
+    expect(document.querySelector('.step-card-chip')).toBeNull();
+  });
+});
+
+// ─── Files ───────────────────────────────────────────────────────────────────
+
+describe('Choosing files', () => {
+  test('XML and DAT files are accepted, anything else is refused', () => {
+    render(<App />);
+    uploadFiles([xmlFile('a.xml'), new File(['x'], 'b.DAT'), new File(['x'], 'c.pdf')]);
+    expect(screen.getByText(/a\.xml/)).toBeInTheDocument();
+    expect(screen.getByText(/b\.DAT/)).toBeInTheDocument();
+    expect(screen.queryByText(/c\.pdf/)).not.toBeInTheDocument();
+    uploadFiles([new File(['x'], 'd.pdf')]);
+    expect(window.alert).toHaveBeenCalledWith('ניתן להעלות קבצי XML ו-DAT בלבד.');
+  });
+
+  test('picking the same file twice lists it once', () => {
+    render(<App />);
+    const file = xmlFile('same.xml');
+    uploadFiles([file]);
+    uploadFiles([file]);
+    expect(screen.getAllByText(/same\.xml/)).toHaveLength(1);
+    expect(screen.getByText('1 קובץ נטען')).toBeInTheDocument();
+  });
+
+  test('files can be removed one by one or all at once', () => {
+    render(<App />);
+    uploadFiles([xmlFile('a.xml'), xmlFile('b.xml')]);
+    fireEvent.click(screen.getAllByRole('button', { name: '✕' })[0]);
+    expect(screen.queryByText(/a\.xml/)).not.toBeInTheDocument();
+    expect(screen.getByText(/b\.xml/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'נקה הכל' }));
+    expect(analyzeButton()).toBeDisabled();
+  });
+
+  test('the file viewer shows the XML tree and returns to the upload screen', async () => {
+    render(<App />);
+    uploadFiles([xmlFile('v.xml', '<Root><Client><ID>123</ID></Client></Root>')]);
+    fireEvent.click(screen.getByRole('button', { name: /הצג קובץ/ }));
+    await screen.findByText('תצוגת קובץ XML');
+    expect(screen.getByText('Client')).toBeInTheDocument();
+    expect(screen.getByText('123')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '→ חזרה' }));
+    expect(screen.getByText(/v\.xml/)).toBeInTheDocument();
+  });
+});
+
+describe('Single / many-clients mode', () => {
+  const bulkTab = () => screen.getByRole('tab', { name: /ניתוח מרובה לקוחות/ });
+  const singleTab = () => screen.getByRole('tab', { name: /לקוח בודד/ });
+
+  test('each mode keeps its own files', () => {
+    render(<App />);
+    uploadFiles([xmlFile('mine.xml')]);
+    fireEvent.click(bulkTab());
+    expect(bulkTab()).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText(/mine\.xml/)).not.toBeInTheDocument();
+    expect(analyzeButton()).toHaveTextContent('נתח את כל הלקוחות');
+    uploadFiles([xmlFile('theirs.xml')]);
+    fireEvent.click(singleTab());
+    expect(screen.getByText(/mine\.xml/)).toBeInTheDocument();
+    expect(screen.queryByText(/theirs\.xml/)).not.toBeInTheDocument();
+  });
+
+  test('a long bulk list is shortened and can be expanded', () => {
+    render(<App />);
+    fireEvent.click(bulkTab());
+    uploadFiles(Array.from({ length: 15 }, (_, i) => xmlFile(`client-${i}.xml`)));
+    expect(document.querySelectorAll('.file-list-item')).toHaveLength(12);
+    fireEvent.click(screen.getByRole('button', { name: /ועוד 3 קבצים — הצג הכל/ }));
+    expect(document.querySelectorAll('.file-list-item')).toHaveLength(15);
+    expect(screen.getByText(/מוכן לניתוח של 15 קבצים/)).toBeInTheDocument();
+  });
+
+  test('bulk mode posts to the bulk endpoint with the same settings', async () => {
+    render(<App />);
+    fireEvent.click(bulkTab());
+    mockFetchJson({ clients: [], errors: [], skipped: [], files_received: 2 });
+    uploadFiles([xmlFile('a.xml'), xmlFile('b.xml')]);
+    fireEvent.click(analyzeButton());
+    const { url, body } = await waitForRequest();
+    expect(url).toBe('http://localhost:8000/compare/bulk');
+    expect(body.getAll('mislaka_file').map(f => f.name)).toEqual(['a.xml', 'b.xml']);
+    expect(body.get('weight_liquidity')).toBe('10');
+  });
+});
+
+// ─── Errors ──────────────────────────────────────────────────────────────────
+
+describe('Error recovery', () => {
+  test.each([
+    ['a network failure', () => fetch.mockRejectedValueOnce(new Error('offline'))],
+    ['a server error', () => fetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })],
+  ])('after %s the user is told and can retry with the same files', async (_, failWith) => {
+    render(<App />);
+    failWith();
+    uploadFiles([xmlFile('keep.xml')]);
+    fireEvent.click(analyzeButton());
+    await waitFor(() => expect(window.alert).toHaveBeenCalledWith('שגיאה בניתוח הנתונים. אנא בדוק שהשרת פועל ונסה שוב.'));
+    expect(screen.getByText(/keep\.xml/)).toBeInTheDocument();
+    expect(analyzeButton()).not.toBeDisabled();
+  });
+
+  test('a failed bulk run returns to bulk mode', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: /ניתוח מרובה לקוחות/ }));
+    fetch.mockRejectedValueOnce(new Error('offline'));
+    uploadFiles([xmlFile('x.xml')]);
+    fireEvent.click(analyzeButton());
+    await waitFor(() => expect(window.alert).toHaveBeenCalled());
+    expect(screen.getByRole('tab', { name: /ניתוח מרובה לקוחות/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('the loading screen is shown while waiting', async () => {
+    render(<App />);
+    fetch.mockImplementationOnce(() => new Promise(() => {}));
+    uploadFiles([xmlFile()]);
+    fireEvent.click(analyzeButton());
+    expect(await screen.findByText('מנתח את הנתונים...')).toBeInTheDocument();
+    expect(document.querySelector('.screen--upload')).toBeNull();
+  });
+});
+
+describe('Theme', () => {
+  test('toggles and remembers the colour theme', () => {
+    render(<App />);
+    const toggle = screen.getByRole('button', { name: /light mode|dark mode/ });
+    const before = document.documentElement.getAttribute('data-theme');
+    fireEvent.click(toggle);
+    const after = document.documentElement.getAttribute('data-theme');
+    expect(after).not.toBe(before);
+    expect(localStorage.getItem('amo-theme')).toBe(after);
+  });
+});
+
+describe('Navigation', () => {
+  test('"new analysis" returns to the upload screen keeping the files', async () => {
+    await goToResults();
+    fireEvent.click(screen.getByRole('button', { name: '← ניתוח חדש' }));
+    expect(screen.getByText(/test\.xml/)).toBeInTheDocument();
   });
 });

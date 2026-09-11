@@ -41,7 +41,36 @@ const getRiskExposure = (thresholds) => ({
   high:   `${thresholds.medium}–130% חשיפה למניות`,
 });
 
-const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 45 };
+const DEFAULT_WEIGHTS = { w1: 10, w3: 20, w5: 25, wSharp: 35, wLiquidity: 10 };
+
+// Order here is the order of the AmoScore weights bar and every weights legend
+const WEIGHT_SEGMENTS = [
+  { key: 'w1',         label: 'תשואה שנה',    gradient: 'linear-gradient(90deg,#059669,#10B981)', color: '#10B981' },
+  { key: 'w3',         label: 'תשואה 3 שנים', gradient: 'linear-gradient(90deg,#2563EB,#3B82F6)', color: '#3B82F6' },
+  { key: 'w5',         label: 'תשואה 5 שנים', gradient: 'linear-gradient(90deg,#7C3AED,#8B5CF6)', color: '#8B5CF6' },
+  { key: 'wSharp',     label: 'Sharp Ratio',  gradient: 'linear-gradient(90deg,#D97706,#F59E0B)', color: '#F59E0B' },
+  { key: 'wLiquidity', label: 'מדד נזילות',   gradient: 'linear-gradient(90deg,#DB2777,#EC4899)', color: '#EC4899' },
+];
+
+const sumWeights = w => WEIGHT_SEGMENTS.reduce((s, seg) => s + (w[seg.key] ?? 0), 0);
+const isSameWeights = (a, b) => WEIGHT_SEGMENTS.every(seg => a[seg.key] === b[seg.key]);
+const DEFAULT_WEIGHTS_TEXT = WEIGHT_SEGMENTS.map(seg => `${seg.label} ${DEFAULT_WEIGHTS[seg.key]}%`).join(' · ');
+
+// Israeli share of a fund's equity component (the rest is abroad); 0–100 = no preference
+const DEFAULT_GEO = { min: 0, max: 100 };
+const GEO_PRESETS = [
+  { label: 'ללא העדפה', min: 0,  max: 100 },
+  { label: 'מוטה ישראל', min: 60, max: 100 },
+  { label: 'מאוזן',      min: 30, max: 70 },
+  { label: 'מוטה חו״ל',  min: 0,  max: 40 },
+];
+const isGeoActive = geo => geo.min > 0 || geo.max < 100;
+
+// Fee mode for the alternative funds. The client's own fund is always net of their fee.
+const FEE_MODES = [
+  { key: 'net',   label: 'כולל דמי ניהול' },
+  { key: 'gross', label: 'ללא דמי ניהול' },
+];
 
 const ALL_HEVROT = [
   'מיטב גמל ופנסיה בע"מ',
@@ -71,50 +100,80 @@ const DEFAULT_BAD_HEVROT = new Set([
   'מבטחים מוסד לביטוח סוציאלי של העובדים בע"מ',
 ]);
 
-const WEIGHT_FIELDS = [
-  { field: 'w1',     label: 'תשואה שנה' },
-  { field: 'w3',     label: 'תשואה 3 שנים' },
-  { field: 'w5',     label: 'תשואה 5 שנים' },
-  { field: 'wSharp', label: 'Sharp Ratio' },
-];
-
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 const fmt = n => Math.round(n).toLocaleString('he-IL');
 
+// Hebrew count phrase: "קובץ אחד" / "3 קבצים"
+const countOf = (n, one, many) => (n === 1 ? one : `${n.toLocaleString('he-IL')} ${many}`);
+const filesCount = n => countOf(n, 'קובץ אחד', 'קבצים');
+const fundsCount = n => countOf(n, 'קופה אחת', 'קופות');
+
+const scoreColor = score =>
+  score == null ? '#64748B' : score >= 70 ? '#10B981' : score >= 50 ? '#3B82F6' : score >= 30 ? '#F59E0B' : '#EF4444';
+// A grade of 0 is ambiguous: "weakest on every metric" or "not enough data to score".
+// The server says which in has_grade; older responses only had the grade.
+export const hasGrade = fund => fund?.has_grade ?? (fund?.grade > 0);
+const gradeText = fund => (hasGrade(fund) ? fmtDec(fund.grade) : '–');
+const gradeOrNull = fund => (hasGrade(fund) ? fund.grade : null);
+
+const scoreVerdict = score =>
+  score == null ? 'אין מספיק נתונים' : score >= 70 ? 'מצוין' : score >= 50 ? 'טוב' : score >= 30 ? 'בינוני' : 'חלש';
+
+// ─── Fee Mode ─────────────────────────────────────────────────────────────────
+
+// An alternative as it should be shown under the chosen fee mode: the server sends
+// figures net of the client's fee at the top level and the fee-free ones under `gross`.
+export function withFeeMode(option, feeMode) {
+  if (!option || feeMode !== 'gross' || !option.gross) return option;
+  return { ...option, ...option.gross };
+}
+
+export function applyFeeMode(holding, feeMode) {
+  return {
+    ...holding,
+    alternatives: (holding.alternatives ?? []).map(a => withFeeMode(a, feeMode)),
+    golden: withFeeMode(holding.golden, feeMode),
+  };
+}
+
 // ─── Fund Aggregation ─────────────────────────────────────────────────────────
 
-function aggregateResults(results) {
+// Projections are proportional to the balance, so a merged holding's NIS figures are the
+// first instance's scaled by the balance ratio (exact — unlike rebuilding them from the
+// rounded diff_percent). "No data" (null) stays null.
+function rescaleProjection(option, factor) {
+  const scaled = { ...option };
+  for (const suffix of ['', '_3', '_5']) {
+    for (const key of [`potential_amount${suffix}`, `diff${suffix}`]) {
+      if (option[key] != null) scaled[key] = option[key] * factor;
+    }
+  }
+  if (option.gross) scaled.gross = rescaleProjection(option.gross, factor);
+  return scaled;
+}
+
+export function aggregateResults(results) {
   const groups = new Map();
   for (const item of results) {
     const id = item.client?.id;
     if (!groups.has(id)) {
-      groups.set(id, { ...item, client: { ...item.client } });
+      groups.set(id, { item, amount: item.client.amount ?? 0, count: 1 });
     } else {
-      groups.get(id).client.amount = (groups.get(id).client.amount ?? 0) + (item.client.amount ?? 0);
+      const group = groups.get(id);
+      group.amount += item.client.amount ?? 0;
+      group.count += 1;
     }
   }
-  return Array.from(groups.values()).map(item => {
-    const newAmount = item.client.amount ?? 0;
-    const recalcAlts = (item.alternatives ?? []).map(alt => ({
-      ...alt,
-      potential_amount:   newAmount * (1 + (alt.diff_percent   ?? 0) / 100),
-      diff:               newAmount * (alt.diff_percent   ?? 0) / 100,
-      potential_amount_3: newAmount * (1 + (alt.diff_percent_3 ?? 0) / 100),
-      diff_3:             newAmount * (alt.diff_percent_3 ?? 0) / 100,
-      potential_amount_5: newAmount * (1 + (alt.diff_percent_5 ?? 0) / 100),
-      diff_5:             newAmount * (alt.diff_percent_5 ?? 0) / 100,
-    }));
-    const golden = item.golden ? {
-      ...item.golden,
-      potential_amount:   newAmount * (1 + (item.golden.diff_percent   ?? 0) / 100),
-      diff:               newAmount * (item.golden.diff_percent   ?? 0) / 100,
-      potential_amount_3: newAmount * (1 + (item.golden.diff_percent_3 ?? 0) / 100),
-      diff_3:             newAmount * (item.golden.diff_percent_3 ?? 0) / 100,
-      potential_amount_5: newAmount * (1 + (item.golden.diff_percent_5 ?? 0) / 100),
-      diff_5:             newAmount * (item.golden.diff_percent_5 ?? 0) / 100,
-    } : item.golden;
-    return { ...item, alternatives: recalcAlts, golden };
+  return Array.from(groups.values()).map(({ item, amount, count }) => {
+    if (count === 1) return item;
+    const factor = item.client.amount ? amount / item.client.amount : 1;
+    return {
+      ...item,
+      client: { ...item.client, amount },
+      alternatives: (item.alternatives ?? []).map(alt => rescaleProjection(alt, factor)),
+      golden: item.golden && item.golden.id ? rescaleProjection(item.golden, factor) : item.golden,
+    };
   });
 }
 
@@ -189,7 +248,7 @@ function GaugeChart({ percentile, rank, total }) {
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
-function Header({ onReset }) {
+function Header({ onReset, resetLabel = '← ניתוח חדש' }) {
   const { theme, toggleTheme } = useContext(ThemeContext);
   return (
     <header className="app-header">
@@ -221,7 +280,7 @@ function Header({ onReset }) {
         {/* Right side: back button (when present) + theme toggle */}
         <div className="header-actions">
           {onReset && (
-            <button className="btn-back" onClick={onReset}>← ניתוח חדש</button>
+            <button className="btn-back" onClick={onReset}>{resetLabel}</button>
           )}
           <button
             className="theme-toggle-btn"
@@ -239,12 +298,9 @@ function Header({ onReset }) {
 
 // ─── Weights Form ─────────────────────────────────────────────────────────────
 
-const WEIGHT_SEGMENTS = [
-  { key: 'w1',     label: 'תשואה שנה',    gradient: 'linear-gradient(90deg,#059669,#10B981)', color: '#10B981' },
-  { key: 'w3',     label: 'תשואה 3 שנים', gradient: 'linear-gradient(90deg,#2563EB,#3B82F6)', color: '#3B82F6' },
-  { key: 'w5',     label: 'תשואה 5 שנים', gradient: 'linear-gradient(90deg,#7C3AED,#8B5CF6)', color: '#8B5CF6' },
-  { key: 'wSharp', label: 'Sharp Ratio',  gradient: 'linear-gradient(90deg,#D97706,#F59E0B)', color: '#F59E0B' },
-];
+// Sum of the first `upTo` segment weights. Divider i sits between segment i and
+// segment i+1; dragging it trades weight between those two only, so the total stays 100%.
+const cumulative = (w, upTo) => WEIGHT_SEGMENTS.slice(0, upTo).reduce((s, seg) => s + w[seg.key], 0);
 
 function WeightsForm({ weights, onChange }) {
   const barRef = useRef(null);
@@ -254,27 +310,19 @@ function WeightsForm({ weights, onChange }) {
   wRef.current = weights;
   onChangeRef.current = onChange;
 
-  const MIN = 0;
-
   useEffect(() => {
     const handleMouseMove = (e) => {
-      if (!dragging.current || !barRef.current) return;
+      if (dragging.current == null || !barRef.current) return;
       const rect = barRef.current.getBoundingClientRect();
       const raw = Math.round(((e.clientX - rect.left) / rect.width) * 100);
       const w = wRef.current;
-
-      if (dragging.current === 'd1') {
-        const v = Math.max(MIN, Math.min(raw, w.w1 + w.w3 - MIN));
-        onChangeRef.current({ ...w, w1: v, w3: w.w1 + w.w3 - v });
-      } else if (dragging.current === 'd2') {
-        const lo = w.w1 + MIN, hi = w.w1 + w.w3 + w.w5 - MIN;
-        const v = Math.max(lo, Math.min(raw, hi));
-        onChangeRef.current({ ...w, w3: v - w.w1, w5: w.w1 + w.w3 + w.w5 - v });
-      } else if (dragging.current === 'd3') {
-        const lo = w.w1 + w.w3 + MIN, hi = 100 - MIN;
-        const v = Math.max(lo, Math.min(raw, hi));
-        onChangeRef.current({ ...w, w5: v - w.w1 - w.w3, wSharp: 100 - v });
-      }
+      const i = dragging.current;
+      const lo = cumulative(w, i);
+      const hi = cumulative(w, i + 2);
+      const v = Math.max(lo, Math.min(raw, hi));
+      const left = WEIGHT_SEGMENTS[i].key;
+      const right = WEIGHT_SEGMENTS[i + 1].key;
+      onChangeRef.current({ ...w, [left]: v - lo, [right]: hi - v });
     };
     const handleMouseUp = () => {
       dragging.current = null;
@@ -296,9 +344,7 @@ function WeightsForm({ weights, onChange }) {
     document.body.style.userSelect = 'none';
   };
 
-  const d1 = weights.w1;
-  const d2 = weights.w1 + weights.w3;
-  const d3 = weights.w1 + weights.w3 + weights.w5;
+  const dividers = WEIGHT_SEGMENTS.slice(0, -1).map((_, i) => ({ id: i, pos: cumulative(weights, i + 1) }));
 
   return (
     <div className="weights-form">
@@ -317,7 +363,7 @@ function WeightsForm({ weights, onChange }) {
           ))}
         </div>
 
-        {[{ id: 'd1', pos: d1 }, { id: 'd2', pos: d2 }, { id: 'd3', pos: d3 }].map(({ id, pos }) => (
+        {dividers.map(({ id, pos }) => (
           <div
             key={id}
             className="risk-band-marker risk-band-marker--draggable"
@@ -386,15 +432,25 @@ function TreeNode({ node, depth = 0 }) {
 
 // ─── Upload Zone ───────────────────────────────────────────────────────────────
 
-function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
+// Files picked twice (same name, size and date) are kept once
+const fileKey = f => `${f.name}|${f.size}|${f.lastModified}`;
+function mergeFiles(existing, added) {
+  const seen = new Set(existing.map(fileKey));
+  return [...existing, ...added.filter(f => !seen.has(fileKey(f)) && seen.add(fileKey(f)))];
+}
+
+const COMPACT_LIST_LIMIT = 12;
+
+function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile, label = 'קבצי מסלקה פנסיונית', hint, compact = false }) {
   const fileInputRef = useRef();
   const folderInputRef = useRef();
+  const [showAll, setShowAll] = useState(false);
 
   const handleChange = (fromFolder) => (e) => {
     const newFiles = Array.from(e.target.files);
     const valid = newFiles.filter(f => /\.(xml|dat)$/i.test(f.name));
     if (valid.length > 0) {
-      onFiles([...files, ...valid]);
+      onFiles(mergeFiles(files, valid));
     } else {
       alert(fromFolder
         ? 'לא נמצאו קבצי XML או DAT בתיקייה שנבחרה.'
@@ -404,6 +460,8 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
   };
 
   const hasFiles = files.length > 0;
+  const listed = compact && !showAll ? files.slice(0, COMPACT_LIST_LIMIT) : files;
+  const hiddenCount = files.length - listed.length;
 
   return (
     <div className="multi-upload-wrap">
@@ -428,11 +486,11 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
         <div className={`upload-file-icon${hasFiles ? ' done' : ''}`}>
           {hasFiles ? '✓' : '📄'}
         </div>
-        <div className="upload-label">קבצי מסלקה פנסיונית</div>
+        <div className="upload-label">{label}</div>
         <div className="upload-sub">
           {hasFiles
-            ? files.length === 1 ? '1 קובץ נטען' : `${files.length} קבצים נטענו`
-            : 'בחר קבצים בודדים או תיקייה שלמה — ייטענו רק קבצי XML ו-DAT'}
+            ? files.length === 1 ? '1 קובץ נטען' : `${files.length.toLocaleString('he-IL')} קבצים נטענו`
+            : hint ?? 'בחר קבצים בודדים או תיקייה שלמה — ייטענו רק קבצי XML ו-DAT'}
         </div>
         <div className="upload-pick-actions">
           <button
@@ -453,8 +511,8 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
       </div>
       {hasFiles && (
         <div className="file-list">
-          {files.map((f, i) => (
-            <div key={i} className="file-list-item">
+          {listed.map((f, i) => (
+            <div key={fileKey(f)} className="file-list-item">
               <span className="file-list-name">📄 {f.name}</span>
               <div className="file-list-actions">
                 {/\.(xml|dat)$/i.test(f.name) && (
@@ -474,6 +532,11 @@ function MultiUploadZone({ files, onFiles, onRemoveFile, onViewFile }) {
               </div>
             </div>
           ))}
+          {compact && files.length > COMPACT_LIST_LIMIT && (
+            <button type="button" className="file-list-more" onClick={() => setShowAll(s => !s)}>
+              {showAll ? 'הצג פחות' : `ועוד ${hiddenCount.toLocaleString('he-IL')} קבצים — הצג הכל`}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -626,6 +689,118 @@ function RiskBandEditor({ low, medium, onChange, overrideRiskLevel, onOverrideRi
   );
 }
 
+// ─── Equity Geography Editor ──────────────────────────────────────────────────
+
+const GEO_MIN_GAP = 5;
+
+function geoSummary(geo) {
+  if (!isGeoActive(geo)) return 'ללא העדפה — כל הקופות יוצעו, בלי קשר לפיזור המניות';
+  return `ישראל ${geo.min}%–${geo.max}% ממרכיב המניות · חו״ל ${100 - geo.max}%–${100 - geo.min}%`;
+}
+
+function GeoFilterEditor({ geo, onChange }) {
+  const barRef = useRef(null);
+  const dragging = useRef(null);
+  const geoRef = useRef(geo);
+  const onChangeRef = useRef(onChange);
+  geoRef.current = geo;
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!dragging.current || !barRef.current) return;
+      const rect = barRef.current.getBoundingClientRect();
+      const raw = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      const g = geoRef.current;
+      if (dragging.current === 'min') {
+        onChangeRef.current({ ...g, min: Math.max(0, Math.min(raw, g.max - GEO_MIN_GAP)) });
+      } else {
+        onChangeRef.current({ ...g, max: Math.min(100, Math.max(raw, g.min + GEO_MIN_GAP)) });
+      }
+    };
+    const handleMouseUp = () => {
+      dragging.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const startDrag = (which) => (e) => {
+    e.preventDefault();
+    dragging.current = which;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  return (
+    <div className="geo-editor">
+      <div className="geo-presets">
+        {GEO_PRESETS.map(p => (
+          <button
+            key={p.label}
+            type="button"
+            className={`leaderboard-filter-btn${geo.min === p.min && geo.max === p.max ? ' active' : ''}`}
+            onClick={() => onChange({ min: p.min, max: p.max })}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="geo-bar-ends">
+        <span><span className="geo-dot geo-dot--il" />100% ישראל</span>
+        <span>100% חו״ל<span className="geo-dot geo-dot--abroad" /></span>
+      </div>
+      <div className="risk-band-bar-wrap" dir="ltr" ref={barRef}>
+        <div className="risk-band-bar geo-bar">
+          <div className="geo-bar-dim" style={{ left: 0, width: `${geo.min}%` }} />
+          <div className="geo-bar-dim" style={{ left: `${geo.max}%`, width: `${100 - geo.max}%` }} />
+        </div>
+        {[{ id: 'min', pos: geo.min }, { id: 'max', pos: geo.max }].map(({ id, pos }) => (
+          <div
+            key={id}
+            className="risk-band-marker risk-band-marker--draggable"
+            style={{ left: `${pos}%` }}
+            onMouseDown={startDrag(id)}
+          >
+            <div className="risk-band-marker-handle" />
+            <div className="risk-band-marker-line" />
+            <div className="risk-band-marker-label">{pos}%</div>
+          </div>
+        ))}
+      </div>
+
+      <div className={`geo-summary${isGeoActive(geo) ? ' geo-summary--active' : ''}`}>{geoSummary(geo)}</div>
+      <div className="geo-hint">
+        הסינון חל על הקופות המוצעות בלבד — הקופה הנוכחית שלך תמיד משתתפת בדירוג.
+        מניות ישראל = חשיפה למניות − חשיפה לחו״ל (לפי גמל נט). בקופות משולבות החשיפה לחו״ל כוללת גם אג״ח,
+        ולכן חלקן של מניות ישראל מוערך שם באופן שמרני.
+      </div>
+    </div>
+  );
+}
+
+// Compact "Israel X% · abroad Y%" line for a fund's equity component
+function GeoSplit({ fund, compact = false }) {
+  const share = fund?.israel_equity_share;
+  if (share == null) return compact ? null : <span className="geo-split geo-split--na">—</span>;
+  const il = Math.round(share);
+  return (
+    <span className={`geo-split${compact ? ' geo-split--compact' : ''}`} title="פיזור מרכיב המניות: ישראל / חו״ל">
+      <span className="geo-split-bar" dir="ltr">
+        <span className="geo-split-il" style={{ width: `${il}%` }} />
+      </span>
+      <span>ישראל {il}% · חו״ל {100 - il}%</span>
+    </span>
+  );
+}
+
 // ─── Hevrot Checklist ─────────────────────────────────────────────────────────
 
 function HevrotChecklist({ badHevrot, onChange }) {
@@ -675,13 +850,16 @@ function HevrotChecklist({ badHevrot, onChange }) {
 
 // ─── Upload Screen ────────────────────────────────────────────────────────────
 
-function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, sumSameFund, onSumSameFundChange, badHevrot, onBadHevrotChange, overrideRiskLevel, onOverrideRiskLevelChange, onAnalyze }) {
-  const sum = weights.w1 + weights.w3 + weights.w5 + weights.wSharp;
-  const ready = mislakaFiles.length > 0 && sum === 100;
-  const hasFiles = mislakaFiles.length > 0;
-  const isDefaultWeights = weights.w1 === DEFAULT_WEIGHTS.w1 && weights.w3 === DEFAULT_WEIGHTS.w3 && weights.w5 === DEFAULT_WEIGHTS.w5 && weights.wSharp === DEFAULT_WEIGHTS.wSharp;
+function UploadScreen({ mode, onModeChange, mislakaFiles, onMislakaFiles, onRemoveMislakaFile, bulkFiles, onBulkFiles, onRemoveBulkFile, onViewFile, weights, onWeightsChange, thresholds, onThresholdsChange, geo, onGeoChange, sumSameFund, onSumSameFundChange, badHevrot, onBadHevrotChange, overrideRiskLevel, onOverrideRiskLevelChange, onAnalyze, onBulkAnalyze }) {
+  const isBulk = mode === 'bulk';
+  const files = isBulk ? bulkFiles : mislakaFiles;
+  const sum = sumWeights(weights);
+  const hasFiles = files.length > 0;
+  const ready = hasFiles && sum === 100;
+  const isDefaultWeights = isSameWeights(weights, DEFAULT_WEIGHTS);
   const [hevrotOpen, setHevrotOpen] = useState(false);
   const [aggregateOpen, setAggregateOpen] = useState(false);
+  const [geoOpen, setGeoOpen] = useState(false);
 
   return (
     <div className="screen screen--upload">
@@ -689,57 +867,104 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
       <Header />
       <div className="upload-content">
 
-        {/* ── Hero ── */}
-        <div className="hero">
-          <div className="hero-badge">השוואת קופות גמל · AmoSight</div>
-          <h1 className="hero-title">בדוק את הביצועים<br/>של הקופות שלך</h1>
-          <p className="hero-sub">
-            העלה קבצים או תיקייה מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופות שלך עומדת מול שוק הגמל
-          </p>
+        {/* ── Mode switch ── */}
+        <div className="mode-switch" role="tablist">
+          <button
+            role="tab"
+            aria-selected={!isBulk}
+            className={`mode-switch-btn${!isBulk ? ' mode-switch-btn--active' : ''}`}
+            onClick={() => onModeChange('single')}
+          >
+            👤 לקוח בודד
+          </button>
+          <button
+            role="tab"
+            aria-selected={isBulk}
+            className={`mode-switch-btn${isBulk ? ' mode-switch-btn--active' : ''}`}
+            onClick={() => onModeChange('bulk')}
+          >
+            👥 ניתוח מרובה לקוחות
+          </button>
         </div>
 
+        {/* ── Hero ── */}
+        {isBulk ? (
+          <div className="hero">
+            <div className="hero-badge">ניתוח תיק לקוחות · AmoSight</div>
+            <h1 className="hero-title">מי מהלקוחות שלך<br/>צריך ניוד בדחיפות?</h1>
+            <p className="hero-sub">
+              העלה בבת אחת את קבצי המסלקה של כל הלקוחות — הקבצים יקובצו אוטומטית לפי תעודת זהות,
+              וכל לקוח יקבל ציון תיק משוקלל וסכום הכסף שהיה מרוויח מניוד
+            </p>
+          </div>
+        ) : (
+          <div className="hero">
+            <div className="hero-badge">השוואת קופות גמל · AmoSight</div>
+            <h1 className="hero-title">בדוק את הביצועים<br/>של הקופות שלך</h1>
+            <p className="hero-sub">
+              העלה קבצים או תיקייה מהמסלקה הפנסיונית וגלה תוך שניות<br/>היכן הקופות שלך עומדת מול שוק הגמל
+            </p>
+          </div>
+        )}
+
         {/* ── Feature strip ── */}
-        <div className="feature-strip">
-          <div className="feature-item">
-            <div className="feature-text">
-              <div className="feature-title">📊 השוואה מול השוק</div>
-              <div className="feature-desc">דירוג מול כל הקופות ברמת הסיכון שלך</div>
+        {!isBulk && (
+          <div className="feature-strip">
+            <div className="feature-item">
+              <div className="feature-text">
+                <div className="feature-title">📊 השוואה מול השוק</div>
+                <div className="feature-desc">דירוג מול כל הקופות ברמת הסיכון שלך</div>
+              </div>
+            </div>
+            <div className="feature-divider" />
+            <div className="feature-item">
+              <div className="feature-text">
+                <div className="feature-title">🏅 3 החלופות הטובות</div>
+                <div className="feature-desc">קופות עם ציון גבוה יותר</div>
+              </div>
+            </div>
+            <div className="feature-divider" />
+            <div className="feature-item">
+              <div className="feature-text">
+                <div className="feature-title">💰 מה החמצת?</div>
+                <div className="feature-desc">הפוטנציאל שאבדת ואיך לשחזר אותו</div>
+              </div>
             </div>
           </div>
-          <div className="feature-divider" />
-          <div className="feature-item">
-            <div className="feature-text">
-              <div className="feature-title">🏅 3 החלופות הטובות</div>
-              <div className="feature-desc">קופות עם ציון גבוה יותר</div>
-            </div>
-          </div>
-          <div className="feature-divider" />
-          <div className="feature-item">
-            <div className="feature-text">
-              <div className="feature-title">💰 מה החמצת?</div>
-              <div className="feature-desc">הפוטנציאל שאבדת ואיך לשחזר אותו</div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* ── Step 1: Upload ── */}
         <div className="upload-step-card">
           <div className="step-card-header">
             <div className="step-card-num">01</div>
-            <div className="step-card-label">העלאת קבצי מסלקה</div>
+            <div className="step-card-label">{isBulk ? 'העלאת קבצי מסלקה של כל הלקוחות' : 'העלאת קבצי מסלקה'}</div>
             {hasFiles && (
-              <button className="quick-action-btn quick-action-btn--clear" onClick={() => onMislakaFiles([])}>
+              <button className="quick-action-btn quick-action-btn--clear" onClick={() => (isBulk ? onBulkFiles : onMislakaFiles)([])}>
                 נקה הכל
               </button>
             )}
           </div>
           <div className="upload-row">
-            <MultiUploadZone
-              files={mislakaFiles}
-              onFiles={onMislakaFiles}
-              onRemoveFile={onRemoveMislakaFile}
-              onViewFile={onViewFile}
-            />
+            {isBulk ? (
+              <MultiUploadZone
+                key="bulk"
+                files={bulkFiles}
+                onFiles={onBulkFiles}
+                onRemoveFile={onRemoveBulkFile}
+                onViewFile={onViewFile}
+                label="קבצי מסלקה של לקוחות רבים"
+                hint="בחר קבצים או תיקייה שלמה — אפשר אלפי קבצים. קבצים של אותו לקוח יאוחדו לפי ת״ז"
+                compact
+              />
+            ) : (
+              <MultiUploadZone
+                key="single"
+                files={mislakaFiles}
+                onFiles={onMislakaFiles}
+                onRemoveFile={onRemoveMislakaFile}
+                onViewFile={onViewFile}
+              />
+            )}
           </div>
         </div>
 
@@ -772,10 +997,30 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           />
         </div>
 
-        {/* ── Step 4: Aggregate ── */}
+        {/* ── Step 4: Equity geography ── */}
+        <div className="upload-step-card">
+          <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setGeoOpen(o => !o)}>
+            <div className="step-card-num">04</div>
+            <div className="step-card-label">
+              מניות ישראל / חו״ל
+              {!geoOpen && isGeoActive(geo) && <span className="step-card-chip">{geoSummary(geo)}</span>}
+            </div>
+            <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
+              {geoOpen ? '▲ סגור' : '▼ פתח'}
+            </span>
+            {isGeoActive(geo) && (
+              <button className="quick-action-btn quick-action-btn--reset" onClick={e => { e.stopPropagation(); onGeoChange(DEFAULT_GEO); }}>
+                ↺ איפוס
+              </button>
+            )}
+          </div>
+          {geoOpen && <GeoFilterEditor geo={geo} onChange={onGeoChange} />}
+        </div>
+
+        {/* ── Step 5: Aggregate ── */}
         <div className="upload-step-card">
           <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setAggregateOpen(o => !o)}>
-            <div className="step-card-num">04</div>
+            <div className="step-card-num">05</div>
             <div className="step-card-label">איחוד קופות זהות</div>
             <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
               {aggregateOpen ? '▲ סגור' : '▼ פתח'}
@@ -803,10 +1048,10 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           )}
         </div>
 
-        {/* ── Step 5: Hevrot ── */}
+        {/* ── Step 6: Hevrot ── */}
         <div className="upload-step-card">
           <div className="step-card-header" style={{ cursor: 'pointer' }} onClick={() => setHevrotOpen(o => !o)}>
-            <div className="step-card-num">05</div>
+            <div className="step-card-num">06</div>
             <div className="step-card-label">בחירת חברות מנהלות</div>
             <span style={{ marginRight: 'auto', marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted, #888)' }}>
               {hevrotOpen ? '▲ סגור' : '▼ פתח'}
@@ -825,14 +1070,14 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
           <button
             className={`btn-analyze${ready ? ' btn-analyze--active' : ''}`}
             disabled={!ready}
-            onClick={onAnalyze}
+            onClick={isBulk ? onBulkAnalyze : onAnalyze}
           >
-            הפעל ניתוח
+            {isBulk ? 'נתח את כל הלקוחות' : 'הפעל ניתוח'}
           </button>
           <div className="analyze-status">
             {!hasFiles && <span className="analyze-status-item">· העלה לפחות קובץ אחד</span>}
             {hasFiles && sum !== 100 && <span className="analyze-status-item">· המשקלות צריכים להסתכם ל-100% (כרגע {sum}%)</span>}
-            {ready && <span className="analyze-status-item analyze-status-ready">· מוכן לניתוח</span>}
+            {ready && <span className="analyze-status-item analyze-status-ready">· מוכן לניתוח{isBulk ? ` של ${files.length.toLocaleString('he-IL')} קבצים` : ''}</span>}
           </div>
         </div>
 
@@ -843,14 +1088,14 @@ function UploadScreen({ mislakaFiles, onMislakaFiles, onRemoveMislakaFile, onVie
 
 // ─── Loading Screen ───────────────────────────────────────────────────────────
 
-function LoadingScreen({ step, progress }) {
+function LoadingScreen({ step, progress, title = 'מנתח את הנתונים...' }) {
   return (
     <div className="screen screen--loading">
 
       <Header />
       <div className="loading-content">
         <div className="loading-emoji">📊</div>
-        <h2 className="loading-title">מנתח את הנתונים...</h2>
+        <h2 className="loading-title">{title}</h2>
         <p className="loading-sub">{LOADING_STEPS[Math.min(step, LOADING_STEPS.length - 1)]}</p>
         <div className="progress-wrap">
           <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -861,11 +1106,136 @@ function LoadingScreen({ step, progress }) {
   );
 }
 
+// ─── Fee Mode Toggle ──────────────────────────────────────────────────────────
+
+function FeeModeToggle({ feeMode, onChange, compact = false }) {
+  const buttons = (
+    <div className="fee-toggle-buttons" role="group" aria-label="דמי ניהול בקופות החלופיות">
+      {FEE_MODES.map(m => (
+        <button
+          key={m.key}
+          type="button"
+          aria-pressed={feeMode === m.key}
+          className={`leaderboard-filter-btn${feeMode === m.key ? ' active' : ''}`}
+          onClick={() => onChange(m.key)}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
+  if (compact) return buttons;
+  return (
+    <div className="fee-toggle">
+      <div className="fee-toggle-text">
+        <div className="fee-toggle-title">💸 דמי ניהול בקופות החלופיות</div>
+        <div className="fee-toggle-desc">
+          {feeMode === 'net'
+            ? 'תשואות החלופות מחושבות בניכוי אותם דמי ניהול שאתה משלם היום'
+            : 'תשואות החלופות מוצגות ברוטו — כאילו תעבור ללא דמי ניהול'}
+          {' · '}הקופה הנוכחית שלך מחושבת תמיד בניכוי דמי הניהול שלך
+        </div>
+      </div>
+      {buttons}
+    </div>
+  );
+}
+
+// ─── Portfolio Score ──────────────────────────────────────────────────────────
+
+function ScoreRing({ score, size = 132 }) {
+  const r = size / 2 - 10;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(score ?? 0, 100)) / 100;
+  const color = scoreColor(score);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="score-ring">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
+      {score != null && (
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={`${c * pct} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      )}
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="var(--text-primary)"
+        fontSize={size * 0.26} fontWeight="800" fontFamily="Rubik, sans-serif">
+        {score != null ? fmtDec(score) : '–'}
+      </text>
+    </svg>
+  );
+}
+
+function PortfolioScoreCard({ portfolio, results }) {
+  if (!portfolio || !results?.length) return null;
+  const score = portfolio.weighted_score;
+  const potential = portfolio.potential_score;
+  const total = results.reduce((s, f) => s + (f.client.amount ?? 0), 0);
+  const holdings = [...results].sort((a, b) => (b.client.amount ?? 0) - (a.client.amount ?? 0));
+  const uncovered = 100 - (portfolio.coverage ?? 0);
+
+  return (
+    <div className="portfolio-card">
+      <div className="portfolio-card-title">🎯 הציון המשוקלל של התיק</div>
+      <div className="portfolio-card-body">
+        <div className="portfolio-card-score">
+          <ScoreRing score={score} />
+          <div className="portfolio-card-verdict" style={{ color: scoreColor(score) }}>{scoreVerdict(score)}</div>
+        </div>
+        <div className="portfolio-card-details">
+          <p>
+            ממוצע ה-AmoScore של הקופות שלך, כשכל קופה נספרת לפי החלק של הכסף שלך שנמצא בה —
+            קופה שמחזיקה 70% מהצבירה משפיעה על הציון פי כמה מקופה קטנה.
+          </p>
+          {potential != null && score != null && potential > score && (
+            <div className="portfolio-card-potential">
+              <span>אם תעבור לחלופה המובילה בכל קופה:</span>
+              <strong style={{ color: scoreColor(potential) }}>{fmtDec(score)} ← {fmtDec(potential)}</strong>
+            </div>
+          )}
+          {portfolio.weighted_percentile != null && (
+            <div className="portfolio-card-note">
+              בממוצע משוקלל, הכסף שלך נמצא באחוזון {Math.round(portfolio.weighted_percentile)} ביחס לקופות המקבילות
+            </div>
+          )}
+          {uncovered > 0.05 && (
+            <div className="portfolio-card-note portfolio-card-note--warn">
+              {fmtDec(uncovered)}% מהצבירה נמצאים בקופות ללא מספיק נתונים לדירוג (למשל קופה חדשה) — הם לא נכללו בציון
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="portfolio-alloc-bar" dir="ltr">
+        {holdings.map((f, i) => (
+          <div
+            key={`${f.client.id}-${i}`}
+            className="portfolio-alloc-seg"
+            style={{ width: `${total > 0 ? (f.client.amount / total) * 100 : 0}%`, background: scoreColor(gradeOrNull(f.client)) }}
+            title={`${f.client.name}: ${fmtDec(total > 0 ? f.client.amount / total * 100 : 0)}% · AmoScore ${gradeText(f.client)}`}
+          />
+        ))}
+      </div>
+      <div className="portfolio-alloc-legend">
+        {holdings.map((f, i) => (
+          <div key={`${f.client.id}-${i}`} className="portfolio-alloc-item">
+            <span className="portfolio-alloc-dot" style={{ background: scoreColor(gradeOrNull(f.client)) }} />
+            <span className="portfolio-alloc-name">{f.client.name}</span>
+            <span className="portfolio-alloc-share">{fmtDec(total > 0 ? f.client.amount / total * 100 : 0)}% מהכסף</span>
+            <span className="portfolio-alloc-score" style={{ color: scoreColor(gradeOrNull(f.client)) }}>
+              {gradeText(f.client)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Fund Results Section ─────────────────────────────────────────────────────
 
-function FundResults({ data, weights, thresholds }) {
+function FundResults({ data, weights, thresholds, feeMode = 'net', onFeeModeChange }) {
   const { client, alternatives, golden: gold } = data;
-  const isNew = client.grade === 0;
+  const isNew = !hasGrade(client);
   const [returnPeriod, setReturnPeriod] = useState(1);
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
 
@@ -978,11 +1348,33 @@ function FundResults({ data, weights, thresholds }) {
               </div>
             </div>
           </div>
+          <div className="client-profile-line">
+            {client.equity_exposure != null && (
+              <span className="client-profile-item">
+                <span className="client-profile-label">מניות {fmtDec(client.equity_exposure)}%:</span>
+                <GeoSplit fund={client} />
+              </span>
+            )}
+            {client.liquidity_index != null && (
+              <span
+                className="client-profile-item"
+                title="צבירה נטו (הפקדות והעברות פנימה פחות משיכות והעברות החוצה) ב-12 החודשים האחרונים, ביחס לנכסי הקופה"
+              >
+                <span className="client-profile-label">צבירה נטו 12 ח׳:</span>
+                <strong style={{ color: client.liquidity_index >= 0 ? '#10B981' : '#EF4444' }}>
+                  {client.liquidity_index > 0 ? '+' : ''}{fmtDec(client.liquidity_index)}%
+                </strong>
+                {client.liquidity_score != null && (
+                  <span className="client-profile-label">(מדד נזילות {Math.round(client.liquidity_score)} מתוך 100)</span>
+                )}
+              </span>
+            )}
+          </div>
         </div>
         <div className="client-score-wrap">
           <div className="gauge-amoscore-label">AmoScore</div>
           <div className="gauge-amoscore-value" style={{ color: isNew ? '#64748B' : '#F8FAFC' }}>
-            {isNew || !client.grade ? '–' : fmtDec(client.grade)}
+            {gradeText(client)}
           </div>
           <GaugeChart percentile={pct} rank={client.rank} total={client.total_in_risk} />
           <div className={`client-verdict ${isNew ? 'verdict--new' : isBelow ? 'verdict--bad' : 'verdict--good'}`}>
@@ -1048,8 +1440,13 @@ function FundResults({ data, weights, thresholds }) {
         <div className="table-header-row">
           <div>
             <div className="table-title">טבלת דירוג — AmoScore</div>
-            <div className="table-title-sub">ממוינות לפי ציון מנורמל, כולל ניכוי דמי ניהול</div>
+            <div className="table-title-sub">
+              {feeMode === 'gross'
+                ? 'תשואות החלופות ברוטו, ללא דמי ניהול · הקופה שלך בניכוי דמי הניהול שלך'
+                : `כל התשואות בניכוי דמי הניהול שלך (${client.dmei_nihul != null ? fmtDec(client.dmei_nihul, 2) : '—'}%)`}
+            </div>
           </div>
+          {onFeeModeChange && <FeeModeToggle feeMode={feeMode} onChange={onFeeModeChange} compact />}
         </div>
         <div className="table-wrap">
           <table className="alts-table">
@@ -1104,6 +1501,7 @@ function FundResults({ data, weights, thresholds }) {
                       <div>{fund.name}</div>
                       {fund.hevra && <div className="td-name-sub">{fund.hevra}</div>}
                       <div className="td-name-sub">קופה #{fund.id}</div>
+                      <GeoSplit fund={fund} compact />
                       {fund.isClient && (
                         <div className={`td-name-tag ${clientIsTop ? 'td-name-tag--client' : 'td-name-tag--client-bad'}`}>הקופה שלך</div>
                       )}
@@ -1111,7 +1509,7 @@ function FundResults({ data, weights, thresholds }) {
                     <td className="td-return" style={{ color }}>
                       {(() => { const v = returnPeriod === 1 ? fund.tsua_1 : returnPeriod === 3 ? fund.tsua_3 : fund.tsua_5; return v != null && v !== 0 ? `${fmtDec(v)}%` : 'N/A'; })()}
                     </td>
-                    <td className="td-score">{fund.grade ? fmtDec(fund.grade) : '–'}</td>
+                    <td className="td-score">{gradeText(fund)}</td>
                     <td className="td-potential">{potentialAmt != null ? `₪${fmt(potentialAmt)}` : '—'}</td>
                     <td className="td-diff">
                       {!fund.isClient && diffAmt != null ? (
@@ -1133,7 +1531,10 @@ function FundResults({ data, weights, thresholds }) {
             </tbody>
           </table>
         </div>
-        <div className="table-footnote">* לא נוכו דמי ניהול חיצוניים מהחישוב · רמת הסיכון נקבעת לפי חשיפה למניות בחודש האחרון</div>
+        <div className="table-footnote">
+          * לא נוכו דמי ניהול חיצוניים מהחישוב · רמת הסיכון נקבעת לפי חשיפה למניות בחודש האחרון
+          {' · '}ה-AmoScore והדירוג אינם תלויים בבחירת דמי הניהול — הם משווים את כל הקופות באותם תנאים
+        </div>
       </div>
 
       {/* 6 ─ High-risk option box + Gold card */}
@@ -1257,8 +1658,12 @@ function pdfFooter(pageNum, total) {
     </div>`;
 }
 
-async function generatePDF(funds, weights) {
+async function generatePDF(funds, weights, { feeMode = 'net', portfolio = null } = {}) {
   const today = new Date().toLocaleDateString('he-IL');
+  const portfolioScore = portfolio?.weighted_score;
+  const feeNote = feeMode === 'gross'
+    ? 'תשואות החלופות מוצגות ברוטו, ללא דמי ניהול · הקופה הנוכחית בניכוי דמי הניהול של הלקוח'
+    : 'כל התשואות מוצגות בניכוי דמי הניהול שהלקוח משלם היום';
   const totalPages = 1 + funds.length;
 
   // ── Summary totals (same logic as SummaryHero) ───────────────────────────────
@@ -1302,22 +1707,40 @@ async function generatePDF(funds, weights) {
       </div>
     </div>` : ''}
 
+    ${portfolioScore != null ? `
+    <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:18px 22px;margin-bottom:16px;
+      display:flex;align-items:center;gap:22px;">
+      <div style="text-align:center;min-width:110px;">
+        <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:4px;">ציון תיק משוקלל</div>
+        <div style="font-size:38px;font-weight:900;color:${scoreColor(portfolioScore)};line-height:1;">${fmtDec(portfolioScore)}</div>
+        <div style="font-size:11px;font-weight:700;color:${scoreColor(portfolioScore)};margin-top:4px;">${scoreVerdict(portfolioScore)}</div>
+      </div>
+      <div style="font-size:11px;color:${PDF_MUTED};line-height:1.7;">
+        ממוצע ה-AmoScore של כל הקופות, משוקלל לפי החלק של הכסף בכל קופה.
+        ${portfolio.potential_score != null && portfolio.potential_score > portfolioScore
+          ? `<br/>אם כל קופה תעבור לחלופה המובילה: <strong style="color:${PDF_TEXT};">${fmtDec(portfolioScore)} ← ${fmtDec(portfolio.potential_score)}</strong>` : ''}
+        ${portfolio.coverage < 99.95 ? `<br/>${fmtDec(100 - portfolio.coverage)}% מהצבירה בקופות ללא מספיק נתונים לדירוג — לא נכללו בציון.` : ''}
+      </div>
+    </div>` : ''}
+
     <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:18px 22px;margin-bottom:16px;">
       <div style="font-size:12px;font-weight:700;color:${PDF_BLUE};margin-bottom:12px;">פרמטרי החישוב — AmoScore</div>
-      <div style="display:flex;gap:14px;">
-        ${[['תשואה שנה',weights.w1],['תשואה 3 שנים',weights.w3],['תשואה 5 שנים',weights.w5],['Sharp Ratio',weights.wSharp]]
-          .map(([label, val]) => `
-          <div style="flex:1;text-align:center;background:#fff;border:1px solid #DBEAFE;border-radius:10px;padding:12px 8px;">
-            <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:5px;">${label}</div>
-            <div style="font-size:20px;font-weight:800;color:${PDF_BLUE};">${val}%</div>
+      <div style="display:flex;gap:10px;">
+        ${WEIGHT_SEGMENTS.map(seg => `
+          <div style="flex:1;text-align:center;background:#fff;border:1px solid #DBEAFE;border-radius:10px;padding:12px 6px;">
+            <div style="font-size:10px;color:${PDF_MUTED};margin-bottom:5px;">${seg.label}</div>
+            <div style="font-size:20px;font-weight:800;color:${PDF_BLUE};">${weights[seg.key] ?? 0}%</div>
           </div>`).join('')}
       </div>
+      <div style="font-size:11px;color:${PDF_MUTED};margin-top:10px;">${feeNote}</div>
     </div>
     <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;padding:16px 22px;">
       <div style="font-size:11px;font-weight:700;color:${PDF_MUTED};margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">כיצד מחושב AmoScore?</div>
       <div style="font-size:11px;color:${PDF_MUTED};line-height:1.7;">
-        AmoScore מחושב על בסיס 4 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, ו-Sharp Ratio.
-        כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה, ולאחר מכן מוכפל במשקל שנבחר.
+        AmoScore מחושב על בסיס 5 פרמטרים: תשואה שנה, תשואה 3 שנים, תשואה 5 שנים, Sharp Ratio ומדד נזילות.
+        התשואות וה-Sharp עוברים נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה; מדד הנזילות
+        (צבירה נטו ב-12 החודשים האחרונים ביחס לנכסי הקופה) מדורג באחוזונים — הקופה עם הצבירה הנטו הגבוהה ביותר
+        מקבלת 100 וזו שיוצאים ממנה הכי הרבה כספים מקבלת 0. כל פרמטר מוכפל במשקל שנבחר.
       </div>
     </div>
     ${pdfFooter(1, totalPages)}`;
@@ -1356,7 +1779,7 @@ async function generatePDF(funds, weights) {
               : ''}
           </td>
           <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-weight:700;font-size:15px;">
-            ${f.grade ? fmtDec(f.grade) : '–'}
+            ${gradeText(f)}
           </td>
           <td style="padding:13px 16px;text-align:center;color:${PDF_TEXT};font-size:14px;">
             ${f.tsua_1 != null ? fmtDec(f.tsua_1) + '%' : '—'}
@@ -1395,7 +1818,7 @@ async function generatePDF(funds, weights) {
           ${[
             ['סכום צבירה',     '₪' + fmt(client.amount)],
             ['תשואה שנתית',    client.tsua_1 ? fmtDec(client.tsua_1) + '%' : 'N/A'],
-            ['AmoScore',       client.grade ? fmtDec(client.grade) : '–'],
+            ['AmoScore',       gradeText(client)],
             ['דמי ניהול',      client.dmei_nihul != null ? fmtDec(client.dmei_nihul, 2) + '%' : '—'],
           ].map(([label, val]) => `
             <div style="flex:1;background:#fff;border:1px solid #DBEAFE;
@@ -1421,7 +1844,7 @@ async function generatePDF(funds, weights) {
         <tbody>${rowsHTML}</tbody>
       </table>
       <div style="font-size:11px;color:${PDF_MUTED};margin-bottom:20px;">
-        * לא נוכו דמי ניהול חיצוניים מהחישוב
+        * לא נוכו דמי ניהול חיצוניים מהחישוב · ${feeNote}
       </div>
 
       ${(() => {
@@ -1538,12 +1961,13 @@ async function generatePDF(funds, weights) {
 
 // ─── Summary Hero helpers ─────────────────────────────────────────────────────
 
-// Takes the best of (same-risk alt, golden) vs current — for the summary total
-function getPotentialAmount(fund) {
+// Takes the best of (same-risk alt, golden) vs current — for the summary total.
+// `suffix` picks the horizon: '' (1 year), '_3' or '_5'.
+function getPotentialAmount(fund, suffix = '', includeGolden = true) {
   const { client, alternatives, golden } = fund;
   const bestAlt = alternatives?.[0];
-  const sameRiskPotential = (bestAlt && client.rank !== 1) ? (bestAlt.potential_amount ?? 0) : 0;
-  const goldenPotential   = golden?.potential_amount ?? 0;
+  const sameRiskPotential = (bestAlt && client.rank !== 1) ? (bestAlt[`potential_amount${suffix}`] ?? 0) : 0;
+  const goldenPotential   = includeGolden ? (golden?.[`potential_amount${suffix}`] ?? 0) : 0;
   const best = Math.max(sameRiskPotential, goldenPotential);
   return best > client.amount ? best : client.amount;
 }
@@ -1721,7 +2145,7 @@ function InviteScreen({ results, onJoined, onBack }) {
           ניתן לעזוב בכל עת · המידע שלך מאוחסן באופן מקומי בלבד
         </p>
         <p className="community-weights-note">
-          * AmoScore בקהילה מחושב לפי משקלים קבועים וסטנדרטיים (תשואה שנה 10% · תשואה 3 שנים 20% · תשואה 5 שנים 25% · Sharp Ratio 45%) — כדי להבטיח השוואה הוגנת בין כל המשקיעים, ללא תלות בהגדרות האישיות שלך.
+          * AmoScore בקהילה מחושב לפי משקלים קבועים וסטנדרטיים ({DEFAULT_WEIGHTS_TEXT}) — כדי להבטיח השוואה הוגנת בין כל המשקיעים, ללא תלות בהגדרות האישיות שלך.
         </p>
       </div>
     </div>
@@ -1765,7 +2189,7 @@ function LeaderboardScreen({ leaderboard, myProfile, onViewProfile, onBack }) {
           <h1 className="community-title">🏅 טבלת המשקיעים</h1>
           <div className="leaderboard-count">{(leaderboard || []).length} משקיעים בקהילה</div>
           <div className="leaderboard-weights-note">
-            * AmoScore מחושב לפי משקלים קבועים: תשואה שנה 10% · תשואה 3 שנים 20% · תשואה 5 שנים 25% · Sharp Ratio 45%
+            * AmoScore מחושב לפי משקלים קבועים: {DEFAULT_WEIGHTS_TEXT}
           </div>
         </div>
 
@@ -1973,10 +2397,13 @@ function ProfileScreen({ fakeName, myProfile, leaderboard, onBack }) {
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
-function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) {
+function ResultsScreen({ results, portfolio, weights, thresholds, feeMode, onFeeModeChange, onReset, resetLabel, subject, onGoToInvite }) {
   const [selectedId, setSelectedId] = useState('all');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [atBottom, setAtBottom] = useState(false);
+
+  // Alternatives as shown under the chosen fee mode; the client's own fund is never affected
+  const viewResults = useMemo(() => (results || []).map(h => applyFeeMode(h, feeMode)), [results, feeMode]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -1998,7 +2425,7 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
   const handleDownloadPDF = async () => {
     setPdfLoading(true);
     try {
-      await generatePDF(results || [], weights);
+      await generatePDF(viewResults, weights, { feeMode, portfolio });
     } catch (e) {
       console.error('PDF Error:', e);
       alert('שגיאה: ' + (e?.message ?? e));
@@ -2008,23 +2435,27 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
   };
 
   const filtered = selectedId === 'all'
-    ? (results || [])
-    : (results || []).filter(d => d.client?.id === selectedId);
+    ? viewResults
+    : viewResults.filter(d => d.client?.id === selectedId);
 
   return (
     <div className="screen screen--results">
 
-      <Header onReset={onReset} />
+      <Header onReset={onReset} resetLabel={resetLabel} />
       <div id="results-content" className="results-content">
 
-        {results && results.length > 0 && (
-          <SummaryHero results={results} />
+        {viewResults.length > 0 && (
+          <div className="results-top">
+            {subject && <div className="results-subject">{subject}</div>}
+            <SummaryHero results={viewResults} />
+            <FeeModeToggle feeMode={feeMode} onChange={onFeeModeChange} />
+          </div>
         )}
 
-        {results && results.length > 1 && (() => {
+        {viewResults.length > 1 && (() => {
           const grouped = [];
           const seen = new Map();
-          for (const d of results) {
+          for (const d of viewResults) {
             const id = d.client?.id;
             if (seen.has(id)) { seen.get(id).count++; } else { const entry = { id, name: d.client?.name, count: 1 }; seen.set(id, entry); grouped.push(entry); }
           }
@@ -2036,7 +2467,7 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
                 value={selectedId}
                 onChange={e => setSelectedId(e.target.value)}
               >
-                <option value="all">כל הקופות ({results.length})</option>
+                <option value="all">כל הקופות ({viewResults.length})</option>
                 {grouped.map(({ id, name, count }) => (
                   <option key={id} value={id}>
                     #{id} — {name}{count > 1 ? ` (×${count})` : ''}
@@ -2049,9 +2480,11 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
 
         {filtered.map((data, i) => (
           <div key={(data.client?.id ?? i) + '-' + i}>
-            <FundResults data={data} weights={weights} thresholds={thresholds} />
+            <FundResults data={data} weights={weights} thresholds={thresholds} feeMode={feeMode} onFeeModeChange={onFeeModeChange} />
           </div>
         ))}
+
+        <PortfolioScoreCard portfolio={portfolio} results={results} />
 
         <div className="amoscore-explanation">
           <div className="amoscore-explanation-header">
@@ -2060,17 +2493,20 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
           </div>
           <div className="amoscore-explanation-body">
             <p>
-              AmoScore הוא ציון מורכב המשקלל ארבעה פרמטרים של ביצועי קופת הגמל: תשואה לשנה, תשואה ל-3 שנים, תשואה ל-5 שנים, ו-Sharp Ratio — מדד לתשואה מתואמת סיכון.
+              AmoScore הוא ציון מורכב המשקלל חמישה פרמטרים של ביצועי קופת הגמל: תשואה לשנה, תשואה ל-3 שנים, תשואה ל-5 שנים, Sharp Ratio — מדד לתשואה מתואמת סיכון — ומדד נזילות.
             </p>
             <p>
-              כל פרמטר עובר נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה, כך שהקופה הטובה ביותר בכל פרמטר מקבלת 100 והחלשה ביותר מקבלת 0. לאחר מכן כל פרמטר מוכפל במשקל שבחרת, והציון הסופי הוא הסכום המשוקלל — מספר בין 0 ל-100 שמאפשר השוואה ישירה בין קופות.
+              התשואות וה-Sharp עוברים נורמליזציה לסקאלה של 0–100 ביחס לכלל הקופות בהשוואה, כך שהקופה הטובה ביותר בכל פרמטר מקבלת 100 והחלשה ביותר מקבלת 0. לאחר מכן כל פרמטר מוכפל במשקל שבחרת, והציון הסופי הוא הסכום המשוקלל — מספר בין 0 ל-100 שמאפשר השוואה ישירה בין קופות.
+            </p>
+            <p>
+              מדד הנזילות הוא הצבירה נטו של הקופה ב-12 החודשים האחרונים (כניסות פחות יציאות) ביחס ליתרת הנכסים שלה, לפי גמל נט. הוא מדורג באחוזונים: הקופה שנכנס אליה הכי הרבה כסף ביחס לגודלה מקבלת 100, וזו שיוצאים ממנה הכי הרבה כספים מקבלת 0.
             </p>
             {weights && (
               <div className="amoscore-weights-chips">
-                {[['תשואה שנה', weights.w1], ['תשואה 3 שנים', weights.w3], ['תשואה 5 שנים', weights.w5], ['Sharp Ratio', weights.wSharp]].map(([label, val]) => (
-                  <div key={label} className="weight-chip">
-                    <div className="weight-chip-label">{label}</div>
-                    <div className="weight-chip-val">{val}%</div>
+                {WEIGHT_SEGMENTS.map(seg => (
+                  <div key={seg.key} className="weight-chip">
+                    <div className="weight-chip-label">{seg.label}</div>
+                    <div className="weight-chip-val">{weights[seg.key] ?? 0}%</div>
                   </div>
                 ))}
               </div>
@@ -2117,19 +2553,352 @@ function ResultsScreen({ results, weights, thresholds, onReset, onGoToInvite }) 
   );
 }
 
+// ─── Bulk Results Screen ──────────────────────────────────────────────────────
+
+const HORIZONS = [
+  { years: 1, suffix: '',   label: 'שנה' },
+  { years: 3, suffix: '_3', label: '3 שנים' },
+  { years: 5, suffix: '_5', label: '5 שנים' },
+];
+const BULK_PAGE_SIZE = 200;
+
+const clientLabel = c => c.client_name || (c.client_id ? `ת״ז ${c.client_id}` : c.files[0]);
+const clientKey = c => c.client_id ?? `file:${c.files[0]}`;
+
+// A client's total NIS gain from moving, over all holdings — the same figure the
+// summary at the top of their full report shows (with the same golden-option rule).
+export function clientUpside(client, feeMode, suffix = '', includeGolden = true) {
+  return client.funds.reduce((sum, raw) => {
+    const h = applyFeeMode(raw, feeMode);
+    return sum + (getPotentialAmount(h, suffix, includeGolden) - h.client.amount);
+  }, 0);
+}
+
+// The client's holding whose move gains the most, and the fund it should move to
+export function topMove(client, feeMode, suffix = '', includeGolden = true) {
+  let best = null;
+  for (const raw of client.funds) {
+    const h = applyFeeMode(raw, feeMode);
+    const gain = getPotentialAmount(h, suffix, includeGolden) - h.client.amount;
+    if (gain <= 0 || (best && gain <= best.gain)) continue;
+    const alt = h.alternatives?.[0];
+    const altPotential = alt && h.client.rank !== 1 ? (alt[`potential_amount${suffix}`] ?? 0) : 0;
+    const goldPotential = includeGolden ? (h.golden?.[`potential_amount${suffix}`] ?? 0) : 0;
+    best = { gain, from: h.client, to: goldPotential > altPotential ? h.golden : alt };
+  }
+  return best;
+}
+
+function csvCell(value) {
+  const s = value == null ? '' : String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  // The BOM makes Excel open the Hebrew text as UTF-8
+  const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const BULK_SORTS = [
+  { key: 'upside',    label: 'רווח ₪' },
+  { key: 'upsidePct', label: 'רווח %' },
+  { key: 'score',     label: 'ציון נמוך' },
+  { key: 'amount',    label: 'צבירה' },
+];
+
+function BulkResultsScreen({ data, feeMode, onFeeModeChange, onBack, onOpenClient }) {
+  const [horizon, setHorizon] = useState(HORIZONS[0]);
+  const [includeGolden, setIncludeGolden] = useState(true);
+  const [sortBy, setSortBy] = useState('upside');
+  const [query, setQuery] = useState('');
+  const [issuesOpen, setIssuesOpen] = useState(false);
+  const [limit, setLimit] = useState(BULK_PAGE_SIZE);
+
+  const rows = useMemo(() => (data?.clients ?? []).map(c => {
+    const upside = clientUpside(c, feeMode, horizon.suffix, includeGolden);
+    return {
+      client: c,
+      upside,
+      upsidePct: c.portfolio.total_amount > 0 ? upside / c.portfolio.total_amount * 100 : 0,
+      move: topMove(c, feeMode, horizon.suffix, includeGolden),
+    };
+  }), [data, feeMode, horizon, includeGolden]);
+
+  const visible = useMemo(() => {
+    const q = query.trim();
+    const matched = q
+      ? rows.filter(r => [r.client.client_id, r.client.client_name, ...r.client.files].some(v => v && String(v).includes(q)))
+      : rows;
+    const score = r => r.client.portfolio.weighted_score ?? 101; // unscored clients sort last
+    const sorters = {
+      upside:    (a, b) => b.upside - a.upside || score(a) - score(b),
+      upsidePct: (a, b) => b.upsidePct - a.upsidePct || score(a) - score(b),
+      score:     (a, b) => score(a) - score(b) || b.upside - a.upside,
+      amount:    (a, b) => b.client.portfolio.total_amount - a.client.portfolio.total_amount,
+    };
+    return [...matched].sort(sorters[sortBy]);
+  }, [rows, query, sortBy]);
+
+  const totalAmount = rows.reduce((s, r) => s + r.client.portfolio.total_amount, 0);
+  const totalUpside = rows.reduce((s, r) => s + r.upside, 0);
+  const needMove = rows.filter(r => r.upside > 0).length;
+  const maxUpside = Math.max(1, ...rows.map(r => r.upside));
+  const issues = [
+    ...(data?.errors ?? []).map(e => ({ file: e.file, text: e.error, kind: 'error' })),
+    ...(data?.skipped ?? []).map(s => ({ file: s.file, text: s.reason, kind: 'skip' })),
+  ];
+  const feeLabel = FEE_MODES.find(m => m.key === feeMode)?.label;
+
+  const handleExport = () => {
+    const header = [
+      'עדיפות', 'ת״ז', 'שם', 'קבצים', 'קופות', 'צבירה כוללת', 'ציון תיק משוקלל', 'ציון אחרי ניוד',
+      'כיסוי דירוג %',
+      `רווח מניוד — ${horizon.label}, ${feeLabel}, ${includeGolden ? 'כולל תפוח הזהב' : 'באותה רמת סיכון'}`,
+      'רווח % מהצבירה', 'מהלך מומלץ',
+    ];
+    const body = visible.map((r, i) => {
+      const p = r.client.portfolio;
+      return [
+        i + 1, r.client.client_id ?? '', r.client.client_name, r.client.files.join(' | '), r.client.funds.length,
+        Math.round(p.total_amount), p.weighted_score ?? '', p.potential_score ?? '', p.coverage,
+        Math.round(r.upside), r.upsidePct.toFixed(2),
+        r.move ? `${r.move.from.name} (#${r.move.from.id}) ← ${r.move.to.name} (#${r.move.to.id})` : '',
+      ];
+    });
+    downloadCsv(`AmoSight-clients-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body]);
+  };
+
+  return (
+    <div className="screen screen--results">
+
+      <Header onReset={onBack} />
+      <div className="results-content bulk-content">
+
+        <div className="bulk-summary">
+          <div className="summary-hero-label">👥 ניתוח מרובה לקוחות</div>
+          <div className="bulk-stats">
+            <div className="bulk-stat">
+              <div className="bulk-stat-val">{rows.length.toLocaleString('he-IL')}</div>
+              <div className="bulk-stat-label">לקוחות</div>
+            </div>
+            <div className="bulk-stat">
+              <div className="bulk-stat-val">{(data?.files_received ?? 0).toLocaleString('he-IL')}</div>
+              <div className="bulk-stat-label">קבצים שהועלו</div>
+            </div>
+            <div className="bulk-stat">
+              <div className="bulk-stat-val">₪{fmt(totalAmount)}</div>
+              <div className="bulk-stat-label">צבירה כוללת</div>
+            </div>
+            <div className="bulk-stat">
+              <div className="bulk-stat-val bulk-stat-val--gain">₪{fmt(totalUpside)}</div>
+              <div className="bulk-stat-label">רווח מניוד · {horizon.label}</div>
+            </div>
+            <div className="bulk-stat">
+              <div className="bulk-stat-val">{needMove.toLocaleString('he-IL')}</div>
+              <div className="bulk-stat-label">לקוחות שירוויחו מניוד</div>
+            </div>
+          </div>
+        </div>
+
+        <FeeModeToggle feeMode={feeMode} onChange={onFeeModeChange} />
+
+        <div className="bulk-controls">
+          <div className="bulk-control-group">
+            <span className="leaderboard-control-label">תקופה:</span>
+            {HORIZONS.map(h => (
+              <button key={h.years} className={`leaderboard-filter-btn${horizon.years === h.years ? ' active' : ''}`} onClick={() => setHorizon(h)}>
+                {h.label}
+              </button>
+            ))}
+          </div>
+          <div className="bulk-control-group">
+            <span className="leaderboard-control-label">חלופות:</span>
+            <button
+              className={`leaderboard-filter-btn${!includeGolden ? ' active' : ''}`}
+              onClick={() => setIncludeGolden(false)}
+              title="רק מעבר לקופה טובה יותר באותה רמת סיכון — הלקוחות שנמצאים בקופה חלשה"
+            >
+              באותה רמת סיכון
+            </button>
+            <button
+              className={`leaderboard-filter-btn${includeGolden ? ' active' : ''}`}
+              onClick={() => setIncludeGolden(true)}
+              title="כולל מעבר לקופה המובילה בסיכון גבוה, כמו בסיכום של כל דוח"
+            >
+              כולל תפוח הזהב 🍎
+            </button>
+          </div>
+          <div className="bulk-control-group">
+            <span className="leaderboard-control-label">מיין לפי:</span>
+            {BULK_SORTS.map(s => (
+              <button key={s.key} className={`leaderboard-filter-btn${sortBy === s.key ? ' active' : ''}`} onClick={() => setSortBy(s.key)}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="bulk-control-group bulk-control-group--grow">
+            <input
+              className="bulk-search"
+              type="search"
+              placeholder="חיפוש לפי ת״ז, שם או קובץ"
+              value={query}
+              onChange={e => { setQuery(e.target.value); setLimit(BULK_PAGE_SIZE); }}
+            />
+            <button className="leaderboard-filter-btn" onClick={handleExport} disabled={visible.length === 0}>
+              ⬇ ייצוא ל-Excel
+            </button>
+          </div>
+        </div>
+
+        {issues.length > 0 && (
+          <div className="bulk-issues">
+            <button className="bulk-issues-toggle" onClick={() => setIssuesOpen(o => !o)}>
+              ⚠ {issues.length === 1 ? 'קובץ אחד לא נותח' : `${issues.length.toLocaleString('he-IL')} קבצים לא נותחו`} {issuesOpen ? '▲' : '▼'}
+            </button>
+            {issuesOpen && (
+              <ul className="bulk-issues-list">
+                {issues.map((it, i) => (
+                  <li key={i} className={`bulk-issue bulk-issue--${it.kind}`}>
+                    <strong>{it.file}</strong> — {it.text}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div className="table-card">
+          <div className="table-header-row">
+            <div>
+              <div className="table-title">הלקוחות לפי דחיפות ניוד</div>
+              <div className="table-title-sub">לחץ על לקוח כדי לפתוח את הדוח המלא שלו</div>
+            </div>
+          </div>
+          {visible.length === 0 ? (
+            <div className="leaderboard-empty">
+              {rows.length === 0 ? 'לא נמצאו בקבצים קופות גמל או השתלמות לניתוח' : 'אין לקוחות שתואמים לחיפוש'}
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="alts-table bulk-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>לקוח</th>
+                    <th>צבירה</th>
+                    <th>ציון תיק</th>
+                    <th>רווח מניוד</th>
+                    <th>המהלך הכדאי ביותר</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.slice(0, limit).map((r, i) => {
+                    const p = r.client.portfolio;
+                    const score = p.weighted_score;
+                    const color = scoreColor(score);
+                    const urgent = i < 3 && r.upside > 0 && sortBy === 'upside';
+                    return (
+                      <tr key={clientKey(r.client)} className="row-alt bulk-row" onClick={() => onOpenClient(r.client)}>
+                        <td>
+                          <span className="rank-badge" style={{
+                            background: urgent ? 'rgba(239,68,68,0.16)' : 'rgba(148,163,184,0.12)',
+                            color: urgent ? '#EF4444' : 'var(--text-secondary)',
+                          }}>
+                            {i + 1}
+                          </span>
+                        </td>
+                        <td className="td-name">
+                          <div>{clientLabel(r.client)}</div>
+                          {r.client.client_id && r.client.client_name && <div className="td-name-sub">ת״ז {r.client.client_id}</div>}
+                          <div className="td-name-sub">{fundsCount(r.client.funds.length)} · {filesCount(r.client.files.length)}</div>
+                        </td>
+                        <td className="td-potential">₪{fmt(p.total_amount)}</td>
+                        <td>
+                          <span className="score-pill" style={{ color, background: `${color}1f`, borderColor: `${color}55` }}>
+                            {score != null ? fmtDec(score) : '–'}
+                          </span>
+                          {p.potential_score != null && score != null && p.potential_score > score && (
+                            <div className="td-name-sub">אחרי ניוד: {fmtDec(p.potential_score)}</div>
+                          )}
+                        </td>
+                        <td className="bulk-upside">
+                          {r.upside > 0 ? (
+                            <>
+                              <div className="bulk-upside-val">+₪{fmt(r.upside)}</div>
+                              <div className="bulk-upside-bar"><div style={{ width: `${(r.upside / maxUpside) * 100}%` }} /></div>
+                              <div className="td-name-sub">+{fmtDec(r.upsidePct, 2)}% מהצבירה</div>
+                            </>
+                          ) : (
+                            <span className="td-name-sub">אין רווח מניוד</span>
+                          )}
+                        </td>
+                        <td className="bulk-move">
+                          {r.move ? (
+                            <>
+                              <div className="td-name-sub">{r.move.from.name}</div>
+                              <div>← {r.move.to.name}</div>
+                            </>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          <button className="bulk-open-btn" onClick={e => { e.stopPropagation(); onOpenClient(r.client); }}>
+                            פתח דוח
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {visible.length > limit && (
+            <button className="file-list-more" onClick={() => setLimit(l => l + BULK_PAGE_SIZE)}>
+              הצג עוד {Math.min(BULK_PAGE_SIZE, visible.length - limit).toLocaleString('he-IL')} לקוחות (מוצגים {limit.toLocaleString('he-IL')} מתוך {visible.length.toLocaleString('he-IL')})
+            </button>
+          )}
+          <div className="table-footnote">
+            רווח מניוד = כמה כסף היה ללקוח היום אילו עבר לפני {horizon.label} לחלופה הטובה ביותר לכל קופה
+            ({includeGolden ? 'החלופה המובילה באותה רמת סיכון, או תפוח הזהב בסיכון גבוה' : 'רק חלופות באותה רמת סיכון'}),
+            {' '}{feeMode === 'net' ? 'בניכוי דמי הניהול שלו' : 'ללא דמי ניהול בקופה החדשה'}.
+            ציון תיק = ממוצע AmoScore של הקופות, משוקלל לפי הצבירה בכל קופה.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 function App() {
   const [screen, setScreen] = useState('upload');
+  const [mode, setMode] = useState('single');
   const [mislakaFiles, setMislakaFiles] = useState([]);
+  const [bulkFiles, setBulkFiles] = useState([]);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [rawResults, setRawResults] = useState(null);
+  const [portfolio, setPortfolio] = useState(null);
+  const [bulkData, setBulkData] = useState(null);
+  const [bulkClient, setBulkClient] = useState(null);
+  const [feeMode, setFeeMode] = useState('net');
   const [sumSameFund, setSumSameFund] = useState(true);
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
+  const [geo, setGeo] = useState(DEFAULT_GEO);
   const [badHevrot, setBadHevrot] = useState(DEFAULT_BAD_HEVROT);
   const [overrideRiskLevel, setOverrideRiskLevel] = useState(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [loadingTitle, setLoadingTitle] = useState(undefined);
   const [viewingFile, setViewingFile] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -2150,8 +2919,17 @@ function App() {
     return sumSameFund ? aggregateResults(rawResults) : rawResults;
   }, [rawResults, sumSameFund]);
 
+  const bulkClientResults = useMemo(() => {
+    if (!bulkClient) return null;
+    return sumSameFund ? aggregateResults(bulkClient.funds) : bulkClient.funds;
+  }, [bulkClient, sumSameFund]);
+
   const handleRemoveMislakaFile = (idx) => {
     setMislakaFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleRemoveBulkFile = (idx) => {
+    setBulkFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleViewFile = useCallback(async (file) => {
@@ -2207,8 +2985,11 @@ function App() {
     URL.revokeObjectURL(url);
   }, [viewingFile]);
 
-  const handleAnalyze = async () => {
+  // Uploads `files` with the current settings to `endpoint`, animating the loading
+  // screen until the response arrives, then hands the parsed JSON to `onDone`.
+  const runAnalysis = async (endpoint, files, onDone, title) => {
     setScreen('loading');
+    setLoadingTitle(title);
     setLoadingStep(0);
     setProgress(0);
 
@@ -2230,14 +3011,17 @@ function App() {
       formData.append('weight_3', weights.w3);
       formData.append('weight_5', weights.w5);
       formData.append('weight_sharp', weights.wSharp);
+      formData.append('weight_liquidity', weights.wLiquidity);
       formData.append('low_exposure_threshold', thresholds.low);
       formData.append('medium_exposure_threshold', thresholds.medium);
+      formData.append('israel_share_min', geo.min);
+      formData.append('israel_share_max', geo.max);
       formData.append('client_id', 'amo_sight_user');
-      mislakaFiles.forEach(f => formData.append('mislaka_file', f));
+      files.forEach(f => formData.append('mislaka_file', f));
       badHevrot.forEach(h => formData.append('bad_hevrot', h));
       if (overrideRiskLevel) formData.append('override_risk_level', overrideRiskLevel);
 
-      const res = await fetch('http://localhost:8000/compare', {
+      const res = await fetch(`http://localhost:8000${endpoint}`, {
         method: 'POST',
         body: formData,
       });
@@ -2246,11 +3030,7 @@ function App() {
       const data = await res.json();
       clearInterval(interval);
       setProgress(100);
-      setTimeout(() => {
-        const funds = data.funds ?? data;
-        setRawResults(Array.isArray(funds) ? funds : [funds]);
-        setScreen('results');
-      }, 500);
+      setTimeout(() => onDone(data), 500);
     } catch (err) {
       clearInterval(interval);
       console.error(err);
@@ -2259,18 +3039,72 @@ function App() {
     }
   };
 
+  const handleAnalyze = () => runAnalysis('/compare', mislakaFiles, (data) => {
+    const funds = data.funds ?? data;
+    setRawResults(Array.isArray(funds) ? funds : [funds]);
+    setPortfolio(data.portfolio ?? null);
+    setScreen('results');
+  });
+
+  const handleBulkAnalyze = () => runAnalysis('/compare/bulk', bulkFiles, (data) => {
+    setBulkData(data);
+    setBulkClient(null);
+    setScreen('bulk-results');
+  }, `מנתח ${bulkFiles.length.toLocaleString('he-IL')} קבצים...`);
+
   const screenContent = (() => {
     if (screen === 'loading') {
-      return <LoadingScreen step={loadingStep} progress={progress} />;
+      return <LoadingScreen step={loadingStep} progress={progress} title={loadingTitle} />;
     }
     if (screen === 'results') {
       return (
         <ResultsScreen
           results={results}
+          portfolio={portfolio}
           weights={weights}
           thresholds={thresholds}
+          feeMode={feeMode}
+          onFeeModeChange={setFeeMode}
           onReset={() => setScreen('upload')}
           onGoToInvite={() => setScreen('invite')}
+        />
+      );
+    }
+    if (screen === 'bulk-results' && bulkData) {
+      return (
+        <BulkResultsScreen
+          data={bulkData}
+          feeMode={feeMode}
+          onFeeModeChange={setFeeMode}
+          onBack={() => setScreen('upload')}
+          onOpenClient={(client) => {
+            setBulkClient(client);
+            setScreen('bulk-client');
+            window.scrollTo(0, 0);
+          }}
+        />
+      );
+    }
+    if (screen === 'bulk-client' && bulkClient) {
+      // No community invite here: the report belongs to one of the advisor's clients
+      return (
+        <ResultsScreen
+          key={clientKey(bulkClient)}
+          results={bulkClientResults}
+          portfolio={bulkClient.portfolio}
+          weights={weights}
+          thresholds={thresholds}
+          feeMode={feeMode}
+          onFeeModeChange={setFeeMode}
+          onReset={() => setScreen('bulk-results')}
+          resetLabel="← חזרה לרשימת הלקוחות"
+          subject={
+            <>
+              📋 דוח עבור <strong>{clientLabel(bulkClient)}</strong>
+              {bulkClient.client_id && bulkClient.client_name && <> · ת״ז {bulkClient.client_id}</>}
+              {' · '}{filesCount(bulkClient.files.length)}
+            </>
+          }
         />
       );
     }
@@ -2333,14 +3167,21 @@ function App() {
     }
     return (
       <UploadScreen
+        mode={mode}
+        onModeChange={setMode}
         mislakaFiles={mislakaFiles}
         onMislakaFiles={setMislakaFiles}
         onRemoveMislakaFile={handleRemoveMislakaFile}
+        bulkFiles={bulkFiles}
+        onBulkFiles={setBulkFiles}
+        onRemoveBulkFile={handleRemoveBulkFile}
         onViewFile={handleViewFile}
         weights={weights}
         onWeightsChange={setWeights}
         thresholds={thresholds}
         onThresholdsChange={setThresholds}
+        geo={geo}
+        onGeoChange={setGeo}
         sumSameFund={sumSameFund}
         onSumSameFundChange={setSumSameFund}
         badHevrot={badHevrot}
@@ -2348,6 +3189,7 @@ function App() {
         overrideRiskLevel={overrideRiskLevel}
         onOverrideRiskLevelChange={setOverrideRiskLevel}
         onAnalyze={handleAnalyze}
+        onBulkAnalyze={handleBulkAnalyze}
       />
     );
   })();

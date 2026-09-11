@@ -1,6 +1,8 @@
 """Unit tests for src/comparison/normalization.py"""
 
-from src.comparison.normalization import normalize_data
+import pytest
+
+from src.comparison.normalization import normalize_data, normalize_liquidity
 from tests.conftest import make_fund
 
 
@@ -62,3 +64,54 @@ class TestNormalizeData:
         original = funds
         normalize_data(funds)
         assert funds is original
+
+
+class TestNormalizeLiquidity:
+    def _funds(self, *values):
+        return [make_fund(str(i), liquidity_index=v) for i, v in enumerate(values)]
+
+    def test_highest_gets_100_and_lowest_gets_0(self):
+        funds = self._funds(12.0, -30.0, 4.0)
+        normalize_liquidity(funds)
+        assert funds[0]["liquidity_index_normalized"] == 100.0
+        assert funds[1]["liquidity_index_normalized"] == 0.0
+
+    def test_ranks_are_evenly_spaced(self):
+        funds = self._funds(-50.0, -1.0, 2.0, 400.0, 9.0)
+        normalize_liquidity(funds)
+        assert [f["liquidity_index_normalized"] for f in funds] == [0.0, 25.0, 50.0, 100.0, 75.0]
+
+    def test_outlier_does_not_squash_the_rest(self):
+        # Percentile rank is robust: one extreme outflow doesn't flatten the others
+        funds = self._funds(-1974.0, 1.0, 2.0)
+        normalize_liquidity(funds)
+        assert funds[1]["liquidity_index_normalized"] == 50.0
+
+    def test_ties_share_their_average_rank(self):
+        funds = self._funds(1.0, 5.0, 5.0, 9.0)
+        normalize_liquidity(funds)
+        assert funds[1]["liquidity_index_normalized"] == pytest.approx(50.0)
+        assert funds[2]["liquidity_index_normalized"] == pytest.approx(50.0)
+
+    def test_missing_data_is_excluded_from_ranking(self):
+        funds = self._funds(None, -3.0, 7.0)
+        normalize_liquidity(funds)
+        assert funds[0]["liquidity_index_normalized"] == 0.0
+        assert funds[1]["liquidity_index_normalized"] == 0.0
+        assert funds[2]["liquidity_index_normalized"] == 100.0
+
+    def test_single_fund_gets_neutral_score(self):
+        funds = self._funds(3.0)
+        normalize_liquidity(funds)
+        assert funds[0]["liquidity_index_normalized"] == 50.0
+
+    def test_zero_is_real_data(self):
+        funds = self._funds(0.0, 5.0)
+        normalize_liquidity(funds)
+        assert funds[0]["liquidity_index_normalized"] == 0.0
+        assert funds[1]["liquidity_index_normalized"] == 100.0
+
+    def test_normalize_data_includes_liquidity(self):
+        funds = self._funds(1.0, 2.0)
+        normalize_data(funds)
+        assert funds[1]["liquidity_index_normalized"] == 100.0

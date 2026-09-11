@@ -5,10 +5,30 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from src.comparison.risk_classifier import RiskClassifier
+from src.comparison.risk_classifier import RiskClassifier, split_equity_exposure
 from src.parsers.xml_utils import extract_data_from_xml
 
 # ----- Functions ----- #
+
+
+def calculate_liquidity_index(net_accumulation: float, total_assets: float) -> float | None:
+    """Return the fund's net 12-month accumulation as a percentage of its assets.
+
+    A negative value means more money left the fund than entered it.
+
+    Args:
+        net_accumulation: ``TZVIRA_NETO`` — inflows minus outflows over the
+            last 12 months.
+        total_assets: ``YITRAT_NCHASIM_LSOF_TKUFA`` — asset balance at the end
+            of the reporting period.
+
+    Returns:
+        ``net_accumulation / total_assets * 100``, or ``None`` when the fund
+        reports no positive asset balance (the ratio is meaningless).
+    """
+    if total_assets <= 0:
+        return None
+    return net_accumulation / total_assets * 100
 
 
 def parse_xml_file(
@@ -38,7 +58,10 @@ def parse_xml_file(
         ``SUG``, ``ID``, ``tsua_mitztaberet_letkufa``,
         ``sharp_ribit_hasarot_sikun``, ``fund_name``, ``hevra``,
         ``hitmahut_rashit``, ``hitmahut_mishnit``, ``tsua_3``, ``tsua_5``,
-        ``num_hevra``, and ``risk_level``.
+        ``num_hevra``, ``risk_level``, ``equity_exposure``,
+        ``foreign_exposure``, ``israel_equity_exposure``,
+        ``israel_equity_share``, ``net_accumulation``, ``total_assets``, and
+        ``liquidity_index``.
     """
     list_of_funds = []
     hey = ET.parse(content)
@@ -66,6 +89,12 @@ def parse_xml_file(
         )
         RISK_LEVEL = risk_classifier.get_risk_level(int(ID), low_exposure_threshold, medium_exposure_threshold)
         EQUITY_EXPOSURE = risk_classifier.get_equity_exposure(int(ID))
+        FOREIGN_EXPOSURE = risk_classifier.get_foreign_exposure(int(ID))
+        ISRAEL_EQUITY_EXPOSURE, ISRAEL_EQUITY_SHARE = split_equity_exposure(
+            EQUITY_EXPOSURE, FOREIGN_EXPOSURE
+        )
+        TZVIRA_NETO = extract_data_from_xml("TZVIRA_NETO", row, float)
+        YITRAT_NCHASIM_LSOF_TKUFA = extract_data_from_xml("YITRAT_NCHASIM_LSOF_TKUFA", row, float)
         TSUA_MITZTABERET_LETKUFA = extract_data_from_xml(
             "TSUA_MITZTABERET_LETKUFA",
             row,
@@ -92,6 +121,12 @@ def parse_xml_file(
                 "num_hevra": NUM_HEVRA,
                 "risk_level": RISK_LEVEL,
                 "equity_exposure": EQUITY_EXPOSURE,
+                "foreign_exposure": FOREIGN_EXPOSURE,
+                "israel_equity_exposure": ISRAEL_EQUITY_EXPOSURE,
+                "israel_equity_share": ISRAEL_EQUITY_SHARE,
+                "net_accumulation": TZVIRA_NETO,
+                "total_assets": YITRAT_NCHASIM_LSOF_TKUFA,
+                "liquidity_index": calculate_liquidity_index(TZVIRA_NETO, YITRAT_NCHASIM_LSOF_TKUFA),
             }
         )
 

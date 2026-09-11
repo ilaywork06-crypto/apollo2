@@ -28,11 +28,21 @@ def parse_multible_mislaka_files(files: list[str]) -> list[dict]:
     return result
 
 
+def _client_name(lakoach: ET._Element) -> str:
+    """Return the client's full name from a ``YeshutLakoach`` element, or ``""``."""
+    parts = (
+        extract_data_from_xml(".//SHEM-PRATI", lakoach).strip(),
+        extract_data_from_xml(".//SHEM-MISHPACHA", lakoach).strip(),
+    )
+    return " ".join(p for p in parts if p and p != "N/A")
+
+
 def parse_mislaka_file(content: str | bytes) -> list[dict]:
     """Parse a single Mislaka XML document and extract per-track holding data.
 
     Strips any XML declaration before parsing (lxml requirement for
-    ``fromstring``).
+    ``fromstring``). Bytes are parsed as-is, so lxml honours the encoding
+    declared in the document.
 
     Args:
         content: The Mislaka XML document as a UTF-8 string or bytes object.
@@ -41,8 +51,9 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
         A list of dicts, each representing one investment track with the
         following keys: ``GEMELNET_ID``, ``SHEM-TOCHNIT``,
         ``TAARICH-HITZTARFUT-MUTZAR``, ``TOTAL-CHISACHON-MTZBR``,
-        ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``, and
-        ``KOD-MEZAHE-YATZRAN``.
+        ``SHEUR-DMEI-NIHUL-TZVIRA``, ``SHEUR-DMEI-NIHUL-HAFKADA``,
+        ``KOD-MEZAHE-YATZRAN``, ``MISPAR-ZIHUY-LAKOACH``, and
+        ``SHEM-LAKOACH``.
     """
     if isinstance(content, str):
         content = re.sub(r"<\?xml[^?]*\?>", "", content).strip()
@@ -52,12 +63,14 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
     dmey_nihul_tsvira_map = map_dmey_nihul(root, 1)
     dmey_nihul_hafkada_map = map_dmey_nihul(root, 2)
 
-    # Extract client ID at file level (same for all records in this file)
+    # Extract client ID and name at file level (same for all records in this file)
     mispar_zihuy_file = "unknown"
+    shem_lakoach = ""
     for lakoach in root.iter("YeshutLakoach"):
         val = extract_data_from_xml(".//MISPAR-ZIHUY-LAKOACH", lakoach)
         if val and val != "N/A":
             mispar_zihuy_file = val
+        shem_lakoach = _client_name(lakoach)
         break
 
     list_of_funds = []
@@ -93,6 +106,7 @@ def parse_mislaka_file(content: str | bytes) -> list[dict]:
                     taarich_hitztarfut_mutzar=TAARICH_HITZTARFUT_MUTZAR,
                     kod_mezahe_yatzran=KOD_MEZAHE_YATZRAN,
                     mispar_zihuy=mispar_zihuy,
+                    shem_lakoach=shem_lakoach,
                 )
                 if track is not None:
                     list_of_funds.append(track)

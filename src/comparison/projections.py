@@ -5,6 +5,7 @@ def calculate_potential_amount(
     current_amount: float, current_fund: dict, better_fund: dict,
     field: str = "tsua_mitztaberet_letkufa",
     years: int = 1,
+    better_field: str | None = None,
 ) -> float:
     """Answer: "If I had migrated to the better fund N years ago, how much would I have today?"
 
@@ -22,13 +23,15 @@ def calculate_potential_amount(
         better_fund: Dict for the comparison fund.
         field: Return field to use (default: 1-year cumulative return).
         years: How many years back to project (1 -> 1-year return, 3 -> 3-year, 5 -> 5-year).
+        better_field: Return field to read from *better_fund* when it differs
+            from *field* (e.g. its gross, pre-fee return). Defaults to *field*.
 
     Returns:
         What the balance would be today had the client been in the better fund
         for the past *years* years, rounded to two decimal places.
     """
     current_return = current_fund[field]
-    better_return = better_fund[field]
+    better_return = better_fund[better_field or field]
     denominator = (1 + current_return / 100) ** years
     if denominator == 0:
         return round(current_amount, 2)

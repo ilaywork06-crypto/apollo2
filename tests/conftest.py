@@ -1,6 +1,19 @@
 """Shared pytest fixtures for all test layers."""
 
+import os
+
 import pytest
+from hypothesis import settings
+
+from src.comparison.risk_classifier import split_equity_exposure
+
+# Property-based tests: no per-example deadline (CI machines vary in speed).
+# HYPOTHESIS_PROFILE=thorough explores more examples; "mutation" is a fast,
+# deterministic profile for mutation-testing runs.
+settings.register_profile("default", deadline=None)
+settings.register_profile("thorough", deadline=None, max_examples=1000)
+settings.register_profile("mutation", deadline=None, max_examples=40, derandomize=True)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 
 # ---------------------------------------------------------------------------
@@ -19,7 +32,12 @@ def make_fund(
     tsua_5: float = 7.0,
     sharpe: float = 1.5,
     equity_exposure: float = 50.0,
+    foreign_exposure: float | None = None,
+    liquidity_index: float | None = None,
 ) -> dict:
+    israel_equity_exposure, israel_equity_share = split_equity_exposure(
+        equity_exposure, foreign_exposure
+    )
     return {
         "ID": fund_id,
         "fund_name": fund_name,
@@ -32,6 +50,10 @@ def make_fund(
         "tsua_5": tsua_5,
         "sharp_ribit_hasarot_sikun": sharpe,
         "equity_exposure": equity_exposure,
+        "foreign_exposure": foreign_exposure,
+        "israel_equity_exposure": israel_equity_exposure,
+        "israel_equity_share": israel_equity_share,
+        "liquidity_index": liquidity_index,
         "hitmahut_rashit": "N/A",
         "hitmahut_mishnit": "N/A",
         "num_hevra": "N/A",
@@ -66,6 +88,7 @@ def make_normalized_fund(
     tsua_3_norm: float = 75.0,
     tsua_5_norm: float = 70.0,
     sharpe_norm: float = 85.0,
+    liquidity_norm: float = 0.0,
     **kwargs,
 ) -> dict:
     fund = make_fund(fund_id=fund_id, **kwargs)
@@ -73,6 +96,7 @@ def make_normalized_fund(
     fund["tsua_3_normalized"] = tsua_3_norm
     fund["tsua_5_normalized"] = tsua_5_norm
     fund["sharp_ribit_hasarot_sikun_normalized"] = sharpe_norm
+    fund["liquidity_index_normalized"] = liquidity_norm
     return fund
 
 

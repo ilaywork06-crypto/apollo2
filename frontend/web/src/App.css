@@ -3399,3 +3399,520 @@ body::before {
 [data-theme="light"] .gauge-text-primary   { fill: #0b1220; }
 [data-theme="light"] .gauge-text-secondary { fill: #8892b0; }
 [data-theme="light"] .gauge-track          { stroke: rgba(136,146,176,0.25); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mode switch · equity geography · fee mode · portfolio score · bulk analysis
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Mode switch (single client / many clients) ─────────────────────────── */
+.mode-switch {
+  display: flex;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 auto 36px;
+  padding: 5px;
+  background: rgba(15,23,42,0.7);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.mode-switch-btn {
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Rubik', sans-serif;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-switch-btn:hover { color: var(--text-primary); }
+
+.mode-switch-btn--active {
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  color: #fff;
+}
+
+.step-card-chip {
+  display: inline-block;
+  margin-right: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.25);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.file-list-more {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px;
+  background: transparent;
+  border: 1px dashed var(--border-light);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Rubik', sans-serif;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.file-list-more:hover { color: var(--text-primary); border-color: var(--accent-blue); }
+
+/* ─── Equity geography editor ────────────────────────────────────────────── */
+.geo-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.geo-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.geo-bar-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: -6px;
+}
+
+.geo-bar-ends > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.geo-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.geo-dot--il     { background: #3B82F6; }
+.geo-dot--abroad { background: #EAB308; }
+
+.geo-bar {
+  position: relative;
+  background: linear-gradient(90deg, #EAB308, #3B82F6);
+}
+
+.geo-bar-dim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(4,5,15,0.72);
+  transition: width 0.1s, left 0.1s;
+}
+
+.geo-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.geo-summary--active { color: var(--accent-blue); }
+
+.geo-hint {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* Compact Israel / abroad split shown next to a fund */
+.geo-split {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.geo-split--compact {
+  display: flex;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.geo-split--na { color: var(--text-muted); }
+
+.geo-split-bar {
+  display: inline-flex;
+  justify-content: flex-end;
+  width: 42px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #EAB308;
+  flex-shrink: 0;
+}
+
+.geo-split--compact .geo-split-bar { width: 32px; height: 5px; }
+
+.geo-split-il {
+  display: block;
+  height: 100%;
+  background: #3B82F6;
+}
+
+/* ─── Client card profile line ───────────────────────────────────────────── */
+.client-profile-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.client-profile-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.client-profile-label { color: var(--text-muted); }
+
+/* ─── Fee mode toggle ────────────────────────────────────────────────────── */
+.results-top {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.results-top .summary-hero { margin-bottom: 0; }
+
+.results-subject {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.results-subject strong { color: var(--text-primary); }
+
+.fee-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: rgba(10,15,32,0.8);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 22px;
+}
+
+.fee-toggle-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.fee-toggle-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 560px;
+}
+
+.fee-toggle-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ─── Portfolio score card ───────────────────────────────────────────────── */
+.portfolio-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 20px;
+  padding: 26px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.portfolio-card-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.portfolio-card-body {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.portfolio-card-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.portfolio-card-verdict {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.portfolio-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.portfolio-card-potential {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.portfolio-card-potential strong { font-size: 18px; }
+
+.portfolio-card-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.portfolio-card-note--warn { color: var(--accent-amber); }
+
+.portfolio-alloc-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  gap: 2px;
+}
+
+.portfolio-alloc-seg { min-width: 3px; }
+
+.portfolio-alloc-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portfolio-alloc-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.portfolio-alloc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.portfolio-alloc-name {
+  flex: 1;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-alloc-share { color: var(--text-muted); white-space: nowrap; }
+
+.portfolio-alloc-score {
+  font-weight: 800;
+  min-width: 40px;
+  text-align: left;
+}
+
+/* ─── Bulk analysis ──────────────────────────────────────────────────────── */
+.bulk-content { gap: 24px; }
+
+.bulk-summary {
+  background: linear-gradient(135deg, #1C1500 0%, #110E00 100%);
+  border: 1px solid rgba(234,179,8,0.3);
+  border-radius: 24px;
+  padding: 28px 32px;
+  text-align: center;
+}
+
+.bulk-summary .summary-hero-label { margin-bottom: 22px; }
+
+.bulk-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 18px;
+}
+
+.bulk-stat-val {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.bulk-stat-val--gain { color: #FBBF24; }
+
+.bulk-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.bulk-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.bulk-control-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bulk-control-group--grow { flex: 1; min-width: 260px; }
+
+.bulk-search {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-family: 'Rubik', sans-serif;
+  color: var(--text-primary);
+}
+
+.bulk-search:focus { outline: none; border-color: var(--accent-blue); }
+
+.bulk-issues {
+  background: rgba(245,158,11,0.06);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+
+.bulk-issues-toggle {
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Rubik', sans-serif;
+  color: var(--accent-amber);
+  cursor: pointer;
+}
+
+.bulk-issues-list {
+  list-style: none;
+  margin-top: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.bulk-issue--error { color: #F87171; }
+.bulk-issue--skip  { color: var(--text-muted); }
+
+.bulk-table { min-width: 760px; }
+
+.bulk-row { cursor: pointer; }
+
+.score-pill {
+  display: inline-block;
+  min-width: 46px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.bulk-upside { min-width: 150px; }
+
+.bulk-upside-val {
+  font-weight: 800;
+  color: var(--accent-green);
+}
+
+.bulk-upside-bar {
+  height: 5px;
+  margin: 5px 0 2px;
+  border-radius: 3px;
+  background: rgba(148,163,184,0.15);
+  overflow: hidden;
+}
+
+.bulk-upside-bar > div {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #10B981, #34D399);
+}
+
+.bulk-move {
+  max-width: 200px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.bulk-open-btn {
+  background: transparent;
+  border: 1px solid rgba(59,130,246,0.4);
+  color: var(--accent-blue);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Rubik', sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bulk-open-btn:hover { background: rgba(59,130,246,0.12); }
+
+@media (max-width: 640px) {
+  .portfolio-card-body { flex-direction: column; align-items: stretch; text-align: center; }
+  .mode-switch-btn { padding: 8px 12px; font-size: 13px; }
+  .fee-toggle { padding: 14px 16px; }
+}
+
+/* ─── Light theme ────────────────────────────────────────────────────────── */
+[data-theme="light"] .mode-switch,
+[data-theme="light"] .fee-toggle,
+[data-theme="light"] .portfolio-card {
+  background: #ffffff;
+  border-color: rgba(136,146,176,0.2);
+  box-shadow: 0 1px 3px rgba(11, 18, 32, 0.05), 0 4px 16px rgba(11, 18, 32, 0.04);
+}
+
+[data-theme="light"] .geo-bar-dim { background: rgba(252,254,255,0.78); }
+
+[data-theme="light"] .bulk-summary {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: rgba(217,119,6,0.3);
+}
+
+[data-theme="light"] .bulk-stat-val--gain { color: #b45309; }

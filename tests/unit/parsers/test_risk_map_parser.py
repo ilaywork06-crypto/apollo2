@@ -48,3 +48,52 @@ class TestParseRiskMap:
         result = parse_risk_map(xml_file)
         assert result[1002] == 50.0
         assert result[1003] == 90.0
+
+
+_EXPOSURES_XML = """\
+<ROWSET>
+  <Row>
+    <ID_KUPA>15311</ID_KUPA>
+    <ID_SUG_NECHES>4751</ID_SUG_NECHES>
+    <SHM_SUG_NECHES>, חשיפה למניות</SHM_SUG_NECHES>
+    <ACHUZ_SUG_NECHES>99.87</ACHUZ_SUG_NECHES>
+  </Row>
+  <Row>
+    <ID_KUPA>15311</ID_KUPA>
+    <ID_SUG_NECHES>4752</ID_SUG_NECHES>
+    <SHM_SUG_NECHES>חשיפה לחו"ל</SHM_SUG_NECHES>
+    <ACHUZ_SUG_NECHES>0.0</ACHUZ_SUG_NECHES>
+  </Row>
+  <Row>
+    <ID_KUPA>127</ID_KUPA>
+    <ID_SUG_NECHES>4752</ID_SUG_NECHES>
+    <SHM_SUG_NECHES>חשיפה לחו"ל</SHM_SUG_NECHES>
+    <ACHUZ_SUG_NECHES>68.9</ACHUZ_SUG_NECHES>
+  </Row>
+  <Row>
+    <ID_KUPA>127</ID_KUPA>
+    <ID_SUG_NECHES>4761</ID_SUG_NECHES>
+    <SHM_SUG_NECHES>חשיפה למט"ח</SHM_SUG_NECHES>
+    <ACHUZ_SUG_NECHES>30.0</ACHUZ_SUG_NECHES>
+  </Row>
+</ROWSET>
+"""
+
+
+class TestParseExposureMaps:
+    def test_returns_equity_and_foreign_maps(self, tmp_path):
+        from src.parsers.risk_map_parser import parse_exposure_maps
+
+        xml_file = tmp_path / "risks.xml"
+        xml_file.write_text(_EXPOSURES_XML, encoding="utf-8")
+        equity, foreign = parse_exposure_maps(xml_file)
+        assert equity == {15311: 99.87}
+        assert foreign == {15311: 0.0, 127: 68.9}
+
+    def test_currency_exposure_is_not_foreign_exposure(self, tmp_path):
+        from src.parsers.risk_map_parser import parse_exposure_maps
+
+        xml_file = tmp_path / "risks.xml"
+        xml_file.write_text(_EXPOSURES_XML, encoding="utf-8")
+        _, foreign = parse_exposure_maps(xml_file)
+        assert foreign[127] == 68.9

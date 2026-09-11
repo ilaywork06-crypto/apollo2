@@ -14,6 +14,7 @@ def build_graded_pool(
     weight_3: int,
     weight_5: int,
     weight_sharp: int,
+    weight_liquidity: int = 0,
 ) -> list[dict]:
     """Deep-copy a fund pool, apply fees, normalise, grade, and sort it.
 
@@ -24,6 +25,7 @@ def build_graded_pool(
         weight_3: Weight for the 3-year average annual return metric.
         weight_5: Weight for the 5-year average annual return metric.
         weight_sharp: Weight for the Sharpe ratio metric.
+        weight_liquidity: Weight for the liquidity index metric.
 
     Returns:
         A new list of fund dicts, fee-adjusted, normalised, graded, and
@@ -31,4 +33,6 @@ def build_graded_pool(
     """
     adjusted = apply_dmey_nihul(copy.deepcopy(funds), dmei_nihul)
     normalize_data(adjusted)
-    return add_grade_and_sort(adjusted, weight_1, weight_3, weight_5, weight_sharp)
+    return add_grade_and_sort(
+        adjusted, weight_1, weight_3, weight_5, weight_sharp, weight_liquidity
+    )

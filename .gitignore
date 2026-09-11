@@ -147,3 +147,7 @@ community.json
 .ua/
 .idea/
 .vscode/
+# Python test artifacts
+.hypothesis/
+.coverage
+htmlcov/

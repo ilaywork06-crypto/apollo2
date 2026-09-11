@@ -232,6 +232,101 @@ class TestCompare:
         assert kwargs["override_risk_level"] == "high"
 
 
+    def test_new_params_passed_through(self, client):
+        with patch("src.api.routers.comparison.run_comparison", return_value={"funds": []}) as mock_engine:
+            client.post(
+                "/compare",
+                data={
+                    "weight_1": "10",
+                    "weight_3": "20",
+                    "weight_5": "25",
+                    "weight_sharp": "35",
+                    "weight_liquidity": "10",
+                    "low_exposure_threshold": "25",
+                    "medium_exposure_threshold": "75",
+                    "israel_share_min": "60",
+                    "israel_share_max": "100",
+                },
+                files=[("mislaka_file", ("test.xml", self._MISLAKA_XML.encode(), "text/xml"))],
+            )
+        _, kwargs = mock_engine.call_args
+        assert kwargs["weight_liquidity"] == 10
+        assert kwargs["israel_share_min"] == 60
+        assert kwargs["israel_share_max"] == 100
+
+    def test_liquidity_weight_defaults_to_zero_for_old_clients(self, client):
+        with patch("src.api.routers.comparison.run_comparison", return_value={"funds": []}) as mock_engine:
+            client.post(
+                "/compare",
+                data={
+                    "weight_1": "10",
+                    "weight_3": "20",
+                    "weight_5": "25",
+                    "weight_sharp": "45",
+                    "low_exposure_threshold": "25",
+                    "medium_exposure_threshold": "75",
+                },
+                files=[("mislaka_file", ("test.xml", self._MISLAKA_XML.encode(), "text/xml"))],
+            )
+        _, kwargs = mock_engine.call_args
+        assert kwargs["weight_liquidity"] == 0
+        assert (kwargs["israel_share_min"], kwargs["israel_share_max"]) == (0, 100)
+
+
+# ---------------------------------------------------------------------------
+# /compare/bulk
+# ---------------------------------------------------------------------------
+
+
+class TestCompareBulk:
+    _FIELDS = {
+        "weight_1": "10",
+        "weight_3": "20",
+        "weight_5": "25",
+        "weight_sharp": "35",
+        "weight_liquidity": "10",
+        "low_exposure_threshold": "25",
+        "medium_exposure_threshold": "75",
+    }
+    _RESULT = {"clients": [], "errors": [], "skipped": [], "files_received": 0}
+
+    def test_passes_files_and_params(self, client):
+        with patch("src.api.routers.comparison.run_bulk_comparison", return_value=self._RESULT) as mock_engine:
+            resp = client.post(
+                "/compare/bulk",
+                data={**self._FIELDS, "bad_hevrot": ["א", "ב"], "override_risk_level": "high"},
+                files=[
+                    ("mislaka_file", ("a.xml", b"<a/>", "text/xml")),
+                    ("mislaka_file", ("b.xml", b"<b/>", "text/xml")),
+                ],
+            )
+        assert resp.status_code == 200
+        args, kwargs = mock_engine.call_args
+        assert args[0] == [("a.xml", b"<a/>"), ("b.xml", b"<b/>")]
+        assert kwargs["weight_liquidity"] == 10
+        assert kwargs["bad_hevrot"] == ["א", "ב"]
+        assert kwargs["override_risk_level"] == "high"
+
+    def test_accepts_more_than_1000_files(self, client):
+        files = [("mislaka_file", (f"f{i}.xml", b"<x/>", "text/xml")) for i in range(1200)]
+        with patch("src.api.routers.comparison.run_bulk_comparison", return_value=self._RESULT) as mock_engine:
+            resp = client.post("/compare/bulk", data=self._FIELDS, files=files)
+        assert resp.status_code == 200
+        assert len(mock_engine.call_args[0][0]) == 1200
+
+    def test_missing_files_returns_422(self, client):
+        resp = client.post("/compare/bulk", data=self._FIELDS)
+        assert resp.status_code == 422
+
+    def test_invalid_weight_returns_422(self, client):
+        resp = client.post(
+            "/compare/bulk",
+            data={**self._FIELDS, "weight_1": "abc"},
+            files=[("mislaka_file", ("a.xml", b"<a/>", "text/xml"))],
+        )
+        assert resp.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # /community/leaderboard
 # ---------------------------------------------------------------------------
@@ -315,3 +410,102 @@ class TestCommunityJoin:
             resp = client.post("/community/join", json=self._PAYLOAD)
         assert resp.status_code == 200
         assert resp.json()["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# End to end over HTTP, with the real engine and data
+# ---------------------------------------------------------------------------
+
+from src.comparison.config import GEMEL_NET_PATH, RISKS_MAP_PATH  # noqa: E402
+from src.comparison.service import run_comparison  # noqa: E402
+
+needs_data = pytest.mark.skipif(
+    not GEMEL_NET_PATH.exists() or not RISKS_MAP_PATH.exists(), reason="Real data files not present"
+)
+
+_FORM = {
+    "weight_1": "10", "weight_3": "20", "weight_5": "25", "weight_sharp": "35", "weight_liquidity": "10",
+    "low_exposure_threshold": "25", "medium_exposure_threshold": "75",
+}
+
+
+def _mislaka_xml(client_id, fund_code, balance="150000.0"):
+    return TestCompare._MISLAKA_XML.replace("987654321", client_id).replace("XX000103", fund_code).replace(
+        "150000.0", balance
+    )
+
+
+@needs_data
+class TestEndToEnd:
+    def test_compare_returns_what_the_service_computes(self, client):
+        xml = _mislaka_xml("987654321", "XX000103")
+        resp = client.post(
+            "/compare",
+            data={**_FORM, "bad_hevrot": ["אקטיון בע\"מ"]},
+            files=[("mislaka_file", ("a.xml", xml.encode("utf-8-sig"), "text/xml"))],
+        )
+        assert resp.status_code == 200
+        expected = run_comparison(
+            mislaka_file=[xml], weight_1=10, weight_3=20, weight_5=25, weight_sharp=35, weight_liquidity=10,
+            low_exposure_threshold=25, medium_exposure_threshold=75, bad_hevrot=['אקטיון בע"מ'],
+        )
+        assert resp.json() == json.loads(json.dumps(expected))
+
+    def test_compare_response_shape(self, client):
+        resp = client.post(
+            "/compare", data=_FORM,
+            files=[("mislaka_file", ("a.xml", _mislaka_xml("1", "XX000103").encode(), "text/xml"))],
+        )
+        body = resp.json()
+        holding = body["funds"][0]
+        assert holding["client"]["id"] == "103"
+        assert {"gross", "israel_equity_share", "liquidity_score", "has_grade"} <= set(holding["alternatives"][0])
+        assert set(body["portfolio"]["upside"]) == {"net", "gross"}
+
+    def test_bulk_ranks_real_clients_and_reports_bad_files(self, client):
+        files = [
+            ("mislaka_file", ("c1.xml", _mislaka_xml("111", "XX000103").encode(), "text/xml")),
+            ("mislaka_file", ("c2.xml", _mislaka_xml("222", "XX000127", "300000.0").encode(), "text/xml")),
+            ("mislaka_file", ("bad.xml", b"<oops", "text/xml")),
+        ]
+        body = client.post("/compare/bulk", data=_FORM, files=files).json()
+        assert {c["client_id"] for c in body["clients"]} == {"111", "222"}
+        upsides = [c["portfolio"]["upside"]["net"]["1"] for c in body["clients"]]
+        assert upsides == sorted(upsides, reverse=True)
+        assert [e["file"] for e in body["errors"]] == ["bad.xml"]
+        assert body["files_received"] == 3
+
+
+class TestBulkErrors:
+    def test_missing_files_explains_why(self, client):
+        resp = client.post("/compare/bulk", data=_FORM)
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "No mislaka_file uploaded"
+
+    def test_invalid_field_is_named_in_the_error(self, client):
+        resp = client.post(
+            "/compare/bulk", data={**_FORM, "weight_3": "lots"},
+            files=[("mislaka_file", ("a.xml", b"<a/>", "text/xml"))],
+        )
+        assert resp.status_code == 422
+        assert [e["loc"] for e in resp.json()["detail"]] == [["weight_3"]]
+
+    def test_missing_required_field(self, client):
+        form = {k: v for k, v in _FORM.items() if k != "weight_sharp"}
+        resp = client.post("/compare/bulk", data=form, files=[("mislaka_file", ("a.xml", b"<a/>", "text/xml"))])
+        assert resp.status_code == 422
+        assert [e["loc"] for e in resp.json()["detail"]] == [["weight_sharp"]]
+
+    def test_defaults_for_optional_fields(self, client):
+        form = {k: v for k, v in _FORM.items() if k != "weight_liquidity"}
+        with patch("src.api.routers.comparison.run_bulk_comparison", return_value={"clients": []}) as engine:
+            client.post("/compare/bulk", data=form, files=[("mislaka_file", ("a.xml", b"<a/>", "text/xml"))])
+        kwargs = engine.call_args.kwargs
+        assert (kwargs["weight_liquidity"], kwargs["israel_share_min"], kwargs["israel_share_max"]) == (0, 0.0, 100.0)
+        assert (kwargs["bad_hevrot"], kwargs["override_risk_level"]) == ([], None)
+
+    def test_uploaded_bytes_are_passed_untouched(self, client):
+        raw = '<?xml version="1.0" encoding="windows-1255"?><x>שלום</x>'.encode("cp1255")
+        with patch("src.api.routers.comparison.run_bulk_comparison", return_value={"clients": []}) as engine:
+            client.post("/compare/bulk", data=_FORM, files=[("mislaka_file", ("h.xml", raw, "text/xml"))])
+        assert engine.call_args.args[0] == [("h.xml", raw)]
